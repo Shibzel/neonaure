@@ -1,22 +1,23 @@
 """
-Neonaure Game
+Neonaure
 
 Authors :
-    - Shibzel (contact@shibzel.me)
+    - Jean-François L. (contact@shibzel.me)
     - Adrien R.
     - Florian S.
 
 Description :
-    TODO
+    Module package for every function and objects that allows the game to run.
+    Also contains a generic `run()` function that runs the game.
     See README.md for information about the project itself.
 """
 
 __version__ = "O.1"
 
 
-# from .controller import *
-# from .view import *
+from .controller import *  # TODO: Spécifier les fonctions et classes à importer
 from .model import Grid, Pattern, Solver
+from .view import *  # Pareil ici
 
 DEFAULT_GRID = "./data/grid/default.json"
 

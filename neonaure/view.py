@@ -1,5 +1,5 @@
 """
-Neonaur - View Module
+Neonaure - View Module
 
 This module handles the graphical user interface (GUI) components, including:
 - The main window and menu bar.
