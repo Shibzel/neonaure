@@ -109,9 +109,9 @@ class Grid:
             for pattern in self.patterns:
                 for cell in pattern.cells:
                     if cell.x > self.height:
-                        self.height = cell.x
+                        self.height = cell.x + 1
                     if cell.y > self.width:
-                        self.width = cell.y
+                        self.width = cell.y + 1
         return self.width, self.height
 
     def neighbours(self, x: int, y: int) -> list:
