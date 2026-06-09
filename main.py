@@ -1,1 +1,4 @@
-print("Hello world!")
+from neonaure import run
+
+if __name__ == "__main__":
+    run()
