@@ -1,6 +1,6 @@
 # Spécifique au projet
-data/saves/*
-rule
+data/saves/
+rule/
 AGENTS.md
 tests/
 compte_rendu/
