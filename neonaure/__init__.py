@@ -12,14 +12,15 @@ Description :
     See README.md for information about the project itself.
 """
 
-__version__ = "O.1"
+from __future__ import annotations
 
+__version__: str = "0.1"
 
-from .controller import *  # TODO: Spécifier les fonctions et classes à importer
-from .model import Grid, Pattern, Solver, Cell, PatternAlreadyLoaded, CellIsImmuable
-from .view import *  # Pareil ici
+from .controller import Controller
+from .model import Cell, CellIsImmuable, Grid, Pattern, PatternAlreadyLoaded, Solver
+from .view import GridView, MainWindow, NumberSelector
 
-DEFAULT_GRID = "./data/grid/default.json"
+DEFAULT_GRID: str = "./data/grids/default.json"
 
 
 def run(file: str = DEFAULT_GRID) -> None:

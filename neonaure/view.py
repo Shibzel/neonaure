@@ -13,30 +13,35 @@ forwarded to the controller.
 - TODO
 """
 
+from __future__ import annotations
+
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont
-from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent
+from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent
+from typing import TYPE_CHECKING
 
-# NumberSelector is a popup dialog that appears when the user clicks on an empty cell, allowing them to select a number from the valid options for that cell's pattern.
+if TYPE_CHECKING:
+    from .controller import Controller
+
+
 class NumberSelector(QDialog):
-    def __init__(self, parent, options, cell_global_pos, cell_size):
+    def __init__(self, parent: QWidget, options: list[int], cell_global_pos: QPoint, cell_size: int) -> None:
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
-        self.selected_number = None
+        self.selected_number: int | None = None
 
-        layout = QGridLayout(self)
+        layout: QGridLayout = QGridLayout(self)
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(2)
 
-        # Scale button size and font proportionally to the current cell size.
-        btn_size = max(25, int(cell_size * 0.7))
-        font_size = max(8, int(cell_size * 0.3))
+        btn_size: int = max(25, int(cell_size * 0.7))
+        font_size: int = max(8, int(cell_size * 0.3))
 
-        row = 0
-        col = 0
+        row: int = 0
+        col: int = 0
         for opt in options:
-            btn = QPushButton(str(opt))
+            btn: QPushButton = QPushButton(str(opt))
             btn.setFixedSize(btn_size, btn_size)
             btn.setFont(QFont("Arial", font_size))
             btn.clicked.connect(lambda checked, n=opt: self.select_number(n))
@@ -48,11 +53,11 @@ class NumberSelector(QDialog):
 
         self.adjustSize()
 
-        popup_width = self.width()
-        popup_height = self.height()
-        
-        x = cell_global_pos.x() + cell_size
-        y = cell_global_pos.y() - (popup_height // 2) + (cell_size // 2)
+        popup_width: int = self.width()
+        popup_height: int = self.height()
+
+        x: int = cell_global_pos.x() + cell_size
+        y: int = cell_global_pos.y() - (popup_height // 2) + (cell_size // 2)
 
         screen_geom = parent.screen().availableGeometry()
         if x + popup_width > screen_geom.right():
@@ -64,49 +69,44 @@ class NumberSelector(QDialog):
 
         self.move(x, y)
 
-    def select_number(self, n):
+    def select_number(self, n: int) -> None:
         self.selected_number = n
         self.accept()
 
-"""
-The GridView class is responsible for rendering the game grid, including cells, numbers, and borders. 
-It also handles mouse events to detect clicks on cells and hover effects.
-"""
+
 class GridView(QWidget):
     cell_clicked: pyqtSignal = pyqtSignal(int, int)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.rows: int = 0
         self.cols: int = 0
         self.cell_size: int = 50
-        self._offset_x: int = 10
-        self._offset_y: int = 10
-        self.values: dict = {}
-        self.thick_borders: list = []
-        self.immutable_cells: set = set()
+        self.offset_x: int = 10
+        self.offset_y: int = 10
+        self.values: dict[tuple[int, int], int] = {}
+        self.thick_borders: list[tuple[int, int, int, int]] = []
+        self.immutable_cells: set[tuple[int, int]] = set()
+        self.pattern_membership: dict[tuple[int, int], str] = {}
         self.setMouseTracking(True)
         self.hovered_row: int = -1
         self.hovered_col: int = -1
 
-    # Calculate the optimal cell size to fit the grid within the widget while keeping cells square.
     def _compute_cell_size(self) -> int:
         if self.rows == 0 or self.cols == 0:
             return 50
-        available_w = self.width() - 20
-        available_h = self.height() - 20
-        cell_w = available_w // self.cols
-        cell_h = available_h // self.rows
+        available_w: int = self.width() - 20
+        available_h: int = self.height() - 20
+        cell_w: int = available_w // self.cols
+        cell_h: int = available_h // self.rows
         return max(20, min(cell_w, cell_h))
 
-    # Center the grid inside the widget by computing horizontal and vertical offsets.
-    def _compute_offset(self):
-        grid_w = self.cols * self.cell_size
-        grid_h = self.rows * self.cell_size
-        self._offset_x = max(0, (self.width() - grid_w) // 2)
-        self._offset_y = max(0, (self.height() - grid_h) // 2)
+    def _compute_offset(self) -> None:
+        grid_w: int = self.cols * self.cell_size
+        grid_h: int = self.rows * self.cell_size
+        self.offset_x = max(0, (self.width() - grid_w) // 2)
+        self.offset_y = max(0, (self.height() - grid_h) // 2)
 
-    # Find cells whose value matches at least one of their 8 neighbors (conflict detection).
     def _compute_conflicts(self) -> set[tuple[int, int]]:
         conflicts: set[tuple[int, int]] = set()
         for (r, c), value in self.values.items():
@@ -114,39 +114,60 @@ class GridView(QWidget):
                 for dc in (-1, 0, 1):
                     if dr == 0 and dc == 0:
                         continue
-                    nr, nc = r + dr, c + dc
+                    nr: int = r + dr
+                    nc: int = c + dc
                     if self.values.get((nr, nc)) == value:
                         conflicts.add((r, c))
+
+        if self.pattern_membership:
+            pattern_cells: dict[str, list[tuple[int, int]]] = {}
+            for pos, pname in self.pattern_membership.items():
+                pattern_cells.setdefault(pname, []).append(pos)
+
+            for cells in pattern_cells.values():
+                for i, (r1, c1) in enumerate(cells):
+                    v1: int | None = self.values.get((r1, c1))
+                    if v1 is None:
+                        continue
+                    for r2, c2 in cells[i + 1:]:
+                        if self.values.get((r2, c2)) == v1:
+                            conflicts.add((r1, c1))
+                            conflicts.add((r2, c2))
+
         return conflicts
 
-    # Recalculate cell size and offset whenever the widget is resized.
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         super().resizeEvent(event)
         self.update()
 
-    # Update the grid data and trigger a full repaint with recalculated dimensions.
-    def set_data(self, rows, cols, values, thick_borders, immutable_cells):
-        self.rows: int = rows
-        self.cols: int = cols
-        self.values: dict = values
-        self.thick_borders: list = thick_borders
-        self.immutable_cells: set = immutable_cells
+    def set_data(
+        self,
+        rows: int,
+        cols: int,
+        values: dict[tuple[int, int], int],
+        thick_borders: list[tuple[int, int, int, int]],
+        immutable_cells: set[tuple[int, int]],
+        pattern_membership: dict[tuple[int, int], str] | None = None,
+    ) -> None:
+        self.rows = rows
+        self.cols = cols
+        self.values = values
+        self.thick_borders = thick_borders
+        self.immutable_cells = immutable_cells
+        self.pattern_membership = pattern_membership or {}
         self.setMinimumSize(self.cols * 20 + 20, self.rows * 20 + 20)
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         self.update()
 
-    """
-    Mouse event handlers to detect clicks and hover effects on cells
-    """
-    def mouseMoveEvent(self, event):
-        x_rel = event.pos().x() - self._offset_x
-        y_rel = event.pos().y() - self._offset_y
-        col = x_rel // self.cell_size
-        row = y_rel // self.cell_size
-        
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        x_rel: int = event.pos().x() - self.offset_x
+        y_rel: int = event.pos().y() - self.offset_y
+        col: int = x_rel // self.cell_size
+        row: int = y_rel // self.cell_size
+
         if 0 <= row < self.rows and 0 <= col < self.cols:
             if self.hovered_row != row or self.hovered_col != col:
                 self.hovered_row = row
@@ -158,41 +179,32 @@ class GridView(QWidget):
                 self.hovered_col = -1
                 self.update()
 
-    """
-    When the mouse leaves the grid area, reset hover state
-    """
-    def leaveEvent(self, event):
+    def leaveEvent(self, event: QEvent) -> None:  # type: ignore[override]
         self.hovered_row = -1
         self.hovered_col = -1
         self.update()
 
-    """
-    When a cell is clicked, emit the cell_clicked signal with the column and row indices
-    """
-    def mousePressEvent(self, event):
-        x_rel = event.pos().x() - self._offset_x
-        y_rel = event.pos().y() - self._offset_y
-        col = x_rel // self.cell_size
-        row = y_rel // self.cell_size
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        x_rel: int = event.pos().x() - self.offset_x
+        y_rel: int = event.pos().y() - self.offset_y
+        col: int = x_rel // self.cell_size
+        row: int = y_rel // self.cell_size
         if 0 <= row < self.rows and 0 <= col < self.cols:
-            local_x = x_rel % self.cell_size
-            local_y = y_rel % self.cell_size
-            margin = 4
+            local_x: int = x_rel % self.cell_size
+            local_y: int = y_rel % self.cell_size
+            margin: int = 4
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
                 self.cell_clicked.emit(col, row)
 
-    """
-    The paintEvent method is responsible for drawing the grid, including cells, numbers, and borders. 
-    It uses QPainter to render the visual elements based on the current state of the grid.
-    """
-    def paintEvent(self, event):
+    def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
         painter: QPainter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         painter.fillRect(self.rect(), Qt.GlobalColor.white)
 
-        ox, oy = self._offset_x, self._offset_y
-        cs = self.cell_size
+        ox: int = self.offset_x
+        oy: int = self.offset_y
+        cs: int = self.cell_size
 
         for i in range(self.rows):
             for j in range(self.cols):
@@ -212,13 +224,12 @@ class GridView(QWidget):
         font: QFont = QFont("Arial", max(8, int(cs * 0.35)))
         painter.setFont(font)
 
-        # Highlight conflicting values in red, normal values in black.
-        conflicts = self._compute_conflicts()
-        red_pen = QPen(QColor(220, 30, 30))
+        conflicts: set[tuple[int, int]] = self._compute_conflicts()
+        red_pen: QPen = QPen(QColor(220, 30, 30))
 
         for (i, j), value in self.values.items():
-            x: int = j * cs + ox
-            y: int = i * cs + oy
+            x = j * cs + ox
+            y = i * cs + oy
             rect: QRect = QRect(x, y, cs, cs)
             if (i, j) in conflicts:
                 painter.setPen(red_pen)
@@ -237,19 +248,14 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
-"""
-The MainWindow class is the main application window that contains the GridView. 
-It initializes the GUI and connects the cell_clicked signal from the GridView to 
-the controller's handle_click method, allowing user interactions to be processed by the controller.
-"""
 class MainWindow(QMainWindow):
-    def __init__(self, controller):
+    def __init__(self, controller: Controller) -> None:
         super().__init__()
         self.controller: Controller = controller
         self.setWindowTitle("Neonaure")
-        self.grid_view = GridView(self)
+        self.grid_view: GridView = GridView(self)
         self.setCentralWidget(self.grid_view)
-        self.grid_view.cell_clicked.connect(self.controller.handle_click)
+        self.grid_view.cell_clicked.connect(self.controller.handle_click)  # type: ignore[arg-type]
         self.resize(500, 500)
 
 
@@ -268,20 +274,19 @@ test_data: dict[str, list[list[int]]] = {
     "motif12": [[3,6,0], [4,6,0],[3,7,0], [4,7,0], [5,7,2]],
     "motif13": [[5,6,0], [6,5,0], [6,6,0], [6,7,0], [7,7,0]],
     "motif14": [[6,3,0]],
-    "motif15": [[5,5,0]]
+    "motif15": [[5,5,0]],
 }
 
-"""
-prepare_test_data is a helper function that processes the test data to extract values, 
-thick borders, immutable cells, and pattern membership information.
-"""
-def prepare_test_data(data):
+
+def prepare_test_data(
+    data: dict[str, list[list[int]]],
+) -> tuple[int, int, dict[tuple[int, int], int], list[tuple[int, int, int, int]], set[tuple[int, int]], dict[tuple[int, int], str]]:
     values: dict[tuple[int, int], int] = {}
     thick_borders: list[tuple[int, int, int, int]] = []
     immutable_cells: set[tuple[int, int]] = set()
     rows: int = 8
     cols: int = 8
-    
+
     pattern_membership: dict[tuple[int, int], str] = {}
     for pattern_name, cells in data.items():
         for r, c, v in cells:
@@ -289,11 +294,11 @@ def prepare_test_data(data):
             if v > 0:
                 values[(r, c)] = v
                 immutable_cells.add((r, c))
-                
+
     for r in range(rows):
         for c in range(cols):
-            current_pattern = pattern_membership.get((r, c))
-            
+            current_pattern: str | None = pattern_membership.get((r, c))
+
             if r == 0 or pattern_membership.get((r-1, c)) != current_pattern:
                 thick_borders.append((c, r, c+1, r))
             if r == rows - 1 or pattern_membership.get((r+1, c)) != current_pattern:
@@ -302,22 +307,18 @@ def prepare_test_data(data):
                 thick_borders.append((c, r, c, r+1))
             if c == cols - 1 or pattern_membership.get((r, c+1)) != current_pattern:
                 thick_borders.append((c+1, r, c+1, r+1))
-                
+
     return rows, cols, values, thick_borders, immutable_cells, pattern_membership
 
-""" 
-The TestWindow class is a simple test application that initializes the GridView 
-with prepared test data and allows the user to interact with the grid. 
-It demonstrates how the view can be used independently for testing purposes. 
-"""
+
 class TestWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Neonaure View Test")
         self.resize(500, 500)
         self.view: GridView = GridView(self)
         self.setCentralWidget(self.view)
-        
+
         r: int
         c: int
         val: dict[tuple[int, int], int]
@@ -325,52 +326,58 @@ class TestWindow(QMainWindow):
         immutables: set[tuple[int, int]]
         p_membership: dict[tuple[int, int], str]
         r, c, val, borders, immutables, p_membership = prepare_test_data(test_data)
-        self.view.set_data(r, c, val, borders, immutables)
+        self.view.set_data(r, c, val, borders, immutables, p_membership)
         self.pattern_membership: dict[tuple[int, int], str] = p_membership
         self.immutable_cells: set[tuple[int, int]] = immutables
         self.values: dict[tuple[int, int], int] = val
-        self.view.cell_clicked.connect(self.handle_test_click)
+        self.view.cell_clicked.connect(self.handle_test_click)  # type: ignore[arg-type]
 
-    def handle_test_click(self, col: int, row: int):
+    def handle_test_click(self, col: int, row: int) -> None:
         if (row, col) in self.immutable_cells:
             return
 
-        current_pattern: str = self.pattern_membership.get((row, col))
+        current_pattern: str | None = self.pattern_membership.get((row, col))
         if not current_pattern:
             return
-            
-        pattern_cells: list[tuple[int, int]] = [(r, c) for (r, c), p in self.pattern_membership.items() if p == current_pattern]
+
+        pattern_cells: list[tuple[int, int]] = [
+            (r, c) for (r, c), p in self.pattern_membership.items() if p == current_pattern
+        ]
         pattern_size: int = len(pattern_cells)
-        
+
         possible_numbers: set[int] = set(range(1, pattern_size + 1))
         used_numbers: set[int] = {
-            self.values.get((r, c)) 
-            for r, c in pattern_cells 
-            if self.values.get((r, c)) is not None 
-            and (r, c) in self.immutable_cells 
+            self.values.get((r, c))
+            for r, c in pattern_cells
+            if self.values.get((r, c)) is not None
+            and (r, c) in self.immutable_cells
             and (r, c) != (row, col)
         }
         remaining_options: list[int] = sorted(list(possible_numbers - used_numbers))
-        
+
         if not remaining_options:
             return
-            
+
         cell_size: int = self.view.cell_size
         local_pos: QPoint = QPoint(
-            col * cell_size + self.view._offset_x,
-            row * cell_size + self.view._offset_y,
+            col * cell_size + self.view.offset_x,
+            row * cell_size + self.view.offset_y,
         )
         global_pos: QPoint = self.view.mapToGlobal(local_pos)
 
         popup: NumberSelector = NumberSelector(self, remaining_options, global_pos, cell_size)
         if popup.exec():
             new_number: int = popup.selected_number
-            # Re-selecting the same number clears the cell, otherwise replace it.
             if new_number == self.values.get((row, col)):
                 del self.values[(row, col)]
             else:
                 self.values[(row, col)] = new_number
-            self.view.set_data(self.view.rows, self.view.cols, self.values, self.view.thick_borders, self.immutable_cells)
+            self.view.set_data(
+                self.view.rows, self.view.cols, self.values,
+                self.view.thick_borders, self.immutable_cells,
+                self.pattern_membership,
+            )
+
 
 if __name__ == "__main__":
     app: QApplication = QApplication(sys.argv)

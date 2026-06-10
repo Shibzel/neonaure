@@ -4,13 +4,20 @@ Neonaure - Controller module
 This module acts as an intermediary between the model and the view:
 - TODO
 """
-from typing import Dict, Tuple, List, Set, Optional
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPoint
-from .view import MainWindow, NumberSelector
-from .model import Grid
 
-# The Controller class is responsible for managing the game state and handling user interactions. It initializes the model and view, updates the view based on the model's state, and processes user clicks on the grid to update the model accordingly.
+from .view import MainWindow, NumberSelector
+from .model import Grid, Pattern, Cell
+
+if TYPE_CHECKING:
+    pass
+
+
 class Controller:
     def __init__(self, file_path: str) -> None:
         self.model: Grid = Grid.from_json(file_path)
@@ -18,8 +25,8 @@ class Controller:
         self.update_view()
 
     def update_view(self) -> None:
-        values: Dict[Tuple[int, int], int] = {}
-        thick_borders: List[Tuple[int, int, int, int]] = []
+        values: dict[tuple[int, int], int] = {}
+        thick_borders: list[tuple[int, int, int, int]] = []
 
         for pattern in self.model.patterns:
             for cell in pattern.cells:
@@ -30,14 +37,14 @@ class Controller:
         cols: int
         rows, cols = self.model.get_dimensions()
 
-        pattern_membership: Dict[Tuple[int, int], str] = {}
+        pattern_membership: dict[tuple[int, int], str] = {}
         for pattern in self.model.patterns:
             for cell in pattern.cells:
                 pattern_membership[(cell.y, cell.x)] = pattern.name
 
         for r in range(rows):
             for c in range(cols):
-                current_pattern: Optional[str] = pattern_membership.get((r, c))
+                current_pattern: str | None = pattern_membership.get((r, c))
 
                 if r == 0 or pattern_membership.get((r-1, c)) != current_pattern:
                     thick_borders.append((c, r, c+1, r))
@@ -48,11 +55,12 @@ class Controller:
                 if c == cols - 1 or pattern_membership.get((r, c+1)) != current_pattern:
                     thick_borders.append((c+1, r, c+1, r+1))
 
-        self.view.grid_view.set_data(rows, cols, values, thick_borders)
-    # The handle_click method processes user clicks on the grid.
+        immutable_cells: set[tuple[int, int]] = set()
+        self.view.grid_view.set_data(rows, cols, values, thick_borders, immutable_cells, pattern_membership)
+
     def handle_click(self, row: int, col: int) -> None:
-        target_pattern: Optional[object] = None
-        target_cell: Optional[object] = None
+        target_pattern: Pattern | None = None
+        target_cell: Cell | None = None
 
         for pattern in self.model.patterns:
             for cell in pattern.cells:
@@ -65,16 +73,17 @@ class Controller:
 
         if not target_pattern or target_cell is None or target_cell.immuable:
             return
+
         pattern_size: int = len(target_pattern.cells)
-        possible_numbers: Set[int] = set(range(1, pattern_size + 1))
-        used_numbers: Set[int] = {
+        possible_numbers: set[int] = set(range(1, pattern_size + 1))
+        used_numbers: set[int] = {
             c.value
             for c in target_pattern.cells
             if c.value != 0
             and c.immuable
             and c != target_cell
         }
-        remaining_options: List[int] = sorted(list(possible_numbers - used_numbers))
+        remaining_options: list[int] = sorted(list(possible_numbers - used_numbers))
 
         if not remaining_options:
             return
