@@ -61,15 +61,11 @@ class Cell:
             return False
         return self.value == other.value
 
-<<<<<<< Updated upstream
-    def to_list(self) -> list:
-        """Returns the cell data as a list [x, y, value, immuable]."""
-=======
     def __hash__(self) -> int:
         return hash((self.x, self.y))
 
     def to_list(self) -> list[int | bool]:
->>>>>>> Stashed changes
+        """Returns the cell data as a list [x, y, value, immuable]."""
         return [self.x, self.y, self.value, self.immuable]
 
     def is_empty(self) -> bool:
@@ -89,15 +85,11 @@ class Pattern:
         self.name: str = name
         self.cells: list[Cell] = cells or []
 
-<<<<<<< Updated upstream
-    def to_list(self) -> list:
-        """Returns the pattern data as a list of cell lists."""
-=======
     def __repr__(self) -> str:
         return f"Pattern(name={self.name!r}, cells={len(self.cells)} cells)"
 
     def to_list(self) -> list[list[int | bool]]:
->>>>>>> Stashed changes
+        """Returns the pattern data as a list of cell lists."""
         return [cell.to_list() for cell in self.cells]
 
     def size(self) -> int:
@@ -129,14 +121,9 @@ class Pattern:
             self.cells.append(Cell(x, y, value, immuable))
 
     @classmethod
-<<<<<<< Updated upstream
-    def from_raw_cells(cls, name: str, raw_cells: list) -> "Pattern":
-        """Creates a Pattern instance from a raw list of cell data."""
-        instance = cls(name)
-=======
     def from_raw_cells(cls, name: str, raw_cells: list[list[int]]) -> Pattern:
+        """Creates a Pattern instance from a raw list of cell data."""
         instance: Pattern = cls(name)
->>>>>>> Stashed changes
         for cell in raw_cells:
             # Logique d'immuabilité :
             # Si la cellule a 4 éléments, cela veut dire qu'elle provient d'une save,
@@ -165,13 +152,8 @@ class Grid:
         self.matrix: list[list[Cell | None]] = [[None for _ in range(self.width)] for _ in range(self.height)]
         self._fill_matrix()
 
-<<<<<<< Updated upstream
-    def to_dict(self) -> dict:
-        """Returns the grid data as a dictionary keyed by pattern names.
-        The result should should be able te be converted into JSON objects."""
-=======
     def to_dict(self) -> dict[str, list[list[int | bool]]]:
->>>>>>> Stashed changes
+        """Returns the grid data as a dictionary keyed by pattern names."""
         return {pattern.name: pattern.to_list() for pattern in self.patterns}
 
     def _fill_matrix(self) -> None:
@@ -200,18 +182,6 @@ class Grid:
                     self.height = cell.y + 1
 
     def get_dimensions(self) -> tuple[int, int]:
-<<<<<<< Updated upstream
-        """Calculates and returns the grid dimensions (width, height)."""
-        if (self.height is None) or (self.width is None):
-            self.height = self.width = 0
-            for pattern in self.patterns:
-                for cell in pattern.cells:
-                    if cell.x > self.width:
-                        self.width = cell.x + 1
-                    if cell.y > self.height:
-                        self.height = cell.y + 1
-=======
->>>>>>> Stashed changes
         return self.width, self.height
 
     def get_cell(self, x: int, y: int) -> Cell | None:
@@ -281,28 +251,18 @@ class Grid:
         return result
 
     @classmethod
-<<<<<<< Updated upstream
-    def from_data(cls, data: dict) -> "Grid":
-        """Creates a Grid instance from a dictionary of pattern data."""
-        patterns: list = []
-=======
     def from_data(cls, data: dict[str, list[list[int]]]) -> Grid:
+        """Creates a Grid instance from a dictionary of pattern data."""
         patterns: list[Pattern] = []
->>>>>>> Stashed changes
         for key, val in data.items():
             if key.startswith(PATTERN_KEY_STARTS_WITH):
                 patterns.append(Pattern.from_raw_cells(key, val))
         return cls(patterns)
 
     @classmethod
-<<<<<<< Updated upstream
-    def from_json(cls, file_path: str):
-        """Creates a Grid instance from a JSON file path."""
-        data: dict = load_json(file_path)
-=======
     def from_json(cls, file_path: str) -> Grid:
+        """Creates a Grid instance from a JSON file path."""
         data: dict[str, list[list[int]]] = load_json(file_path)  # type: ignore[assignment]
->>>>>>> Stashed changes
         return cls.from_data(data)
 
     def save_grid_to_json(self, file_path: str) -> None:
@@ -362,17 +322,7 @@ class Solver:
         return list(possible_values)
 
     def solve_grid(self) -> bool:
-<<<<<<< Updated upstream
         """Fills the grid using backtracking. Returns True if solved."""
-        # Gather all empty cells (nodes with no color yet)
-        empty_cells: list = [
-=======
-        """
-        Uses a "backtracking" algorithm etc etc TODO
-        Things to consider :
-            - This method fills the grid that has been initialized
-            - TODO
-        """
         for pattern in self.grid.patterns:
             for cell in pattern.cells:
                 if cell.value != 0 and self._has_conflict(cell):
@@ -383,7 +333,6 @@ class Solver:
                             return False
 
         empty_cells: list[Cell] = [
->>>>>>> Stashed changes
             cell for pattern in self.grid.patterns
             for cell in pattern.cells if cell.value == 0
         ]
