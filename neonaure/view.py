@@ -339,7 +339,10 @@ class TestWindow(QMainWindow):
         popup: NumberSelector = NumberSelector(self, remaining_options, global_pos, cell_size)
         if popup.exec():
             new_number: int = popup.selected_number
-            self.values[(row, col)] = new_number
+            if new_number == self.values.get((row, col)):
+                del self.values[(row, col)]
+            else:
+                self.values[(row, col)] = new_number
             self.view.set_data(self.view.rows, self.view.cols, self.values, self.view.thick_borders, self.immutable_cells)
 
 if __name__ == "__main__":
