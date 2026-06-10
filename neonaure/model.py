@@ -135,10 +135,10 @@ class Grid:
     def neighbours(self, x: int, y: int) -> list[Cell]:
         """Returns a list of the closest neighbours of a cell."""
         offsets = [
-            (-1, 0), (1, 0), (0, -1), (0, 1), # 4 directions cardinales
+            (-1, 0), (1, 0), (0, -1), (0, 1),  # 4 directions cardinales
             (-1, -1), (-1, 1), (1, -1), (1, 1) # diagonales
         ]
-        result = []
+        result: list = []
         for dx, dy in offsets:
             nx, ny = x + dx, y + dy
             if (0 <= nx < self.width) and (0 <= ny < self.height):
@@ -149,7 +149,7 @@ class Grid:
 
     @classmethod
     def from_data(cls, data: dict) -> "Grid":
-        patterns = []
+        patterns: list = []
         for key, val in data.items():
             # La clé se doit de commencer par "motif"
             if key.startswith(PATTERN_KEY_STARTS_WITH):
@@ -167,7 +167,7 @@ class Grid:
 
 
 class Solver:
-    """Solves the Neonaure grid. TODO"""
+    """Solves the Neonaure grid using Graph Coloring theory and Backtracking."""
 
     def __init__(self, grid: Grid) -> None:
         self.grid = grid
@@ -187,8 +187,97 @@ class Solver:
             for cell in pattern.cells
         )
 
+    def _get_pattern_for_cell(self, cell: Cell) -> Pattern:
+        """Retrieves the Pattern object containing the given cell."""
+        for pattern in self.grid.patterns:
+            for p_cell in pattern.cells:
+                if p_cell.x == cell.x and p_cell.y == cell.y:
+                    return pattern
+        raise ValueError(f"Cell at ({cell.x}, {cell.y}) does not belong to any pattern.")
+
+    def _get_possible_values(self, cell: Cell) -> list[int]:
+        """
+        Calculates the domain (possible values) for a cell based on Graph Coloring constraints.
+        A value is possible if it is not used by adjacent nodes (neighbours)
+        or nodes within the same clique (pattern).
+        """
+        pattern: Pattern = self._get_pattern_for_cell(cell)
+        n: int = len(pattern.cells)
+        possible_values: set = set(range(1, n + 1))
+
+        # Contrainte 1: Retirer les valeurs des nodes adjacentes
+        for neighbour in self.grid.neighbours(cell.x, cell.y):
+            if neighbour.value != 0:
+                possible_values.discard(neighbour.value)
+
+        # Contrainte 2: Retirer les valeurs du même motif
+        for p_cell in pattern.cells:
+            if p_cell.value != 0 and p_cell is not cell:
+                possible_values.discard(p_cell.value)
+
+        return list(possible_values)
+
+    def solve_grid(self) -> bool:
+        """
+        Uses a "backtracking" algorithm etc etc TODO
+        Things to consider :
+            - This method fills the grid that has been initialized
+            - TODO
+        """
+        # Gather all empty cells (nodes with no color yet)
+        empty_cells: list = [
+            cell for pattern in self.grid.patterns
+            for cell in pattern.cells if cell.value == 0
+        ]
+
+        return self._backtrack(empty_cells)
+
+    def _backtrack(self, empty_cells: list[Cell]) -> bool:
+        """Recursive backtracking algorithm to color the graph."""
+        if not empty_cells:
+            return True
+
+        # On cherche la cellule égale à 0 qui a le plus petit nombre possibilités
+        best_cell: Cell | None = None
+        best_options: list = []
+        min_options: float = float('inf')
+        best_index: int = -1
+
+        for i, cell in enumerate(empty_cells):
+            options = self._get_possible_values(cell)
+
+            # Si une case n'a plus d'options alors on fait face à un cul de sac
+            if len(options) == 0:
+                return False
+
+            if len(options) < min_options:
+                min_options = len(options)
+                best_cell = cell
+                best_options = options
+                best_index = i
+                if min_options == 1:
+                    break
+
+        empty_cells.pop(best_index)
+
+        # Try each possible value for the chosen cell
+        for value in best_options:
+            best_cell.set_value(value)  # Coloration
+
+            # Si on est sur une solution, on renvoie True
+            if self._backtrack(empty_cells):
+                return True
+
+            # Fail, on "backtrack"
+            best_cell.set_value(0)
+
+        # Si aucune valeur ne fonctionne, on met ma cellule dans la liste et on signale l'échec
+        empty_cells.insert(best_index, best_cell)
+        return False
+
 
 if __name__ == "__main__":
+    # Sh*tty lines of code to test everything, do not pay attention
     data = load_json("./data/grids/default.json")
     print(data)
     grid = Grid.from_data(data)
@@ -201,3 +290,12 @@ if __name__ == "__main__":
     for x in grid.neighbours(0, 5):
         print(x.value, end="")
     print("")
+
+    solver = Solver(grid)
+    is_solved = solver.solve_grid()
+    print("solved ? ", is_solved)
+    print("is solved ? ", solver.is_solved())
+    for x in grid.matrix:
+        for y in x:
+            print(y.value, end="")
+        print("")
