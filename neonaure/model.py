@@ -1,10 +1,13 @@
 """
 Neonaure - Model module
 
+Author(s):
+    - Jean-François L. (contact@shibzel.mes)
+
 This module contains the core data structures and business logic:
 - Grid, Motif, and Cell classes to represent the game state.
 - Methods to load/save grids.
-- TODO
+- Solver class using Graph Coloring and Backtracking.
 """
 
 import json
