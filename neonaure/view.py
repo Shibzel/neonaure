@@ -16,9 +16,9 @@ forwarded to the controller.
 from __future__ import annotations
 
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent
-from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon, QPainterPath
+from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent, QSize
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -248,15 +248,134 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
+def _create_trash_icon(size: int = 64) -> QIcon:
+    pixmap: QPixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    p: QPainter = QPainter(pixmap)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    s: int = size
+    pen: QPen = QPen(QColor(60, 60, 60), max(2, s // 20))
+    p.setPen(pen)
+    p.setBrush(QColor(180, 50, 50))
+
+    # couvercle
+    lid_top: int = int(s * 0.15)
+    lid_bot: int = int(s * 0.25)
+    lid_left: int = int(s * 0.2)
+    lid_right: int = int(s * 0.8)
+    p.drawRect(lid_left, lid_top, lid_right - lid_left, lid_bot - lid_top)
+    # poignée du couvercle
+    handle_w: int = int(s * 0.2)
+    p.drawRect(s // 2 - handle_w // 2, int(s * 0.05), handle_w, int(s * 0.12))
+
+    # corps de la poubelle
+    body_top: int = lid_bot
+    body_bot: int = int(s * 0.85)
+    body_left: int = int(s * 0.25)
+    body_right: int = int(s * 0.75)
+    p.drawRect(body_left, body_top, body_right - body_left, body_bot - body_top)
+
+    # lignes verticales sur le corps
+    p.setPen(QPen(QColor(60, 60, 60), max(1, s // 30)))
+    for frac in (0.38, 0.5, 0.62):
+        lx: int = int(s * frac)
+        p.drawLine(lx, body_top + int(s * 0.05), lx, body_bot - int(s * 0.05))
+
+    p.end()
+    return QIcon(pixmap)
+
+
+def _create_undo_icon(size: int = 64) -> QIcon:
+    import math
+    pixmap: QPixmap = QPixmap(size, size)
+    pixmap.fill(QColor(0, 0, 0, 0))
+    p: QPainter = QPainter(pixmap)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    s: int = size
+    pen: QPen = QPen(QColor(70, 130, 180), max(3, s // 14))
+    p.setPen(pen)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+
+    cx: float = s * 0.5
+    cy: float = s * 0.55
+    radius: float = s * 0.28
+
+    start_angle: int = -30 * 16
+    span_angle: int = -300 * 16
+    p.drawArc(
+        int(cx - radius), int(cy - radius),
+        int(radius * 2), int(radius * 2),
+        start_angle, span_angle,
+    )
+
+    # pointe de fleche au debut de l'arc (angle -30 - 300 = -330 = 30 deg)
+    tip_angle: float = math.radians(30)
+    tx: float = cx + radius * math.cos(tip_angle)
+    ty: float = cy - radius * math.sin(tip_angle)
+
+    arrow_len: float = s * 0.16
+    for offset in (math.pi / 5, -math.pi / 5):
+        angle: float = tip_angle + math.pi + offset
+        ax: float = tx + arrow_len * math.cos(angle)
+        ay: float = ty - arrow_len * math.sin(angle)
+        p.drawLine(QPoint(int(tx), int(ty)), QPoint(int(ax), int(ay)))
+
+    p.end()
+    return QIcon(pixmap)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, controller: Controller) -> None:
         super().__init__()
         self.controller: Controller = controller
         self.setWindowTitle("Neonaure")
-        self.grid_view: GridView = GridView(self)
-        self.setCentralWidget(self.grid_view)
+        self.grid_view: GridView = GridView()
+
+        central: QWidget = QWidget()
+        main_layout: QHBoxLayout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.grid_view, stretch=1)
+
+        btn_panel: QVBoxLayout = QVBoxLayout()
+        btn_panel.setSpacing(8)
+
+        btn_style: str = (
+            "QPushButton { border: none; border-radius: 8px; background: transparent; }"
+            "QPushButton:hover { background: rgba(100, 150, 200, 30); }"
+            "QPushButton:pressed { background: rgba(100, 150, 200, 60); }"
+        )
+        trash_style: str = (
+            "QPushButton { border: none; border-radius: 8px; background: transparent; }"
+            "QPushButton:hover { background: rgba(200, 60, 60, 30); }"
+            "QPushButton:pressed { background: rgba(200, 60, 60, 60); }"
+        )
+
+        self.undo_button: QPushButton = QPushButton()
+        self.undo_button.setIcon(_create_undo_icon(64))
+        self.undo_button.setIconSize(QSize(40, 40))
+        self.undo_button.setFixedSize(56, 56)
+        self.undo_button.setToolTip("Annuler le dernier coup")
+        self.undo_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.undo_button.setStyleSheet(btn_style)
+        self.undo_button.clicked.connect(self.controller.undo)
+        btn_panel.addWidget(self.undo_button)
+
+        self.reset_button: QPushButton = QPushButton()
+        self.reset_button.setIcon(_create_trash_icon(64))
+        self.reset_button.setIconSize(QSize(40, 40))
+        self.reset_button.setFixedSize(56, 56)
+        self.reset_button.setToolTip("Réinitialiser la grille")
+        self.reset_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_button.setStyleSheet(trash_style)
+        self.reset_button.clicked.connect(self.controller.reset_grid)
+        btn_panel.addWidget(self.reset_button)
+
+        btn_panel.addStretch()
+        main_layout.addLayout(btn_panel)
+
+        self.setCentralWidget(central)
         self.grid_view.cell_clicked.connect(self.controller.handle_click)  # type: ignore[arg-type]
-        self.resize(500, 500)
+        self.resize(560, 500)
 
 
 test_data: dict[str, list[list[int]]] = {
@@ -315,9 +434,53 @@ class TestWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Neonaure View Test")
-        self.resize(500, 500)
-        self.view: GridView = GridView(self)
-        self.setCentralWidget(self.view)
+        self.resize(560, 500)
+        self.view: GridView = GridView()
+        self.history: list[tuple[tuple[int, int], int]] = []
+
+        central: QWidget = QWidget()
+        main_layout: QHBoxLayout = QHBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.view, stretch=1)
+
+        btn_panel: QVBoxLayout = QVBoxLayout()
+        btn_panel.setSpacing(8)
+
+        btn_style: str = (
+            "QPushButton { border: none; border-radius: 8px; background: transparent; }"
+            "QPushButton:hover { background: rgba(100, 150, 200, 30); }"
+            "QPushButton:pressed { background: rgba(100, 150, 200, 60); }"
+        )
+        trash_style: str = (
+            "QPushButton { border: none; border-radius: 8px; background: transparent; }"
+            "QPushButton:hover { background: rgba(200, 60, 60, 30); }"
+            "QPushButton:pressed { background: rgba(200, 60, 60, 60); }"
+        )
+
+        self.undo_button: QPushButton = QPushButton()
+        self.undo_button.setIcon(_create_undo_icon(64))
+        self.undo_button.setIconSize(QSize(40, 40))
+        self.undo_button.setFixedSize(56, 56)
+        self.undo_button.setToolTip("Annuler le dernier coup")
+        self.undo_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.undo_button.setStyleSheet(btn_style)
+        self.undo_button.clicked.connect(self.undo)
+        btn_panel.addWidget(self.undo_button)
+
+        self.reset_button: QPushButton = QPushButton()
+        self.reset_button.setIcon(_create_trash_icon(64))
+        self.reset_button.setIconSize(QSize(40, 40))
+        self.reset_button.setFixedSize(56, 56)
+        self.reset_button.setToolTip("Réinitialiser la grille")
+        self.reset_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_button.setStyleSheet(trash_style)
+        self.reset_button.clicked.connect(self.reset_grid)
+        btn_panel.addWidget(self.reset_button)
+
+        btn_panel.addStretch()
+        main_layout.addLayout(btn_panel)
+
+        self.setCentralWidget(central)
 
         r: int
         c: int
@@ -368,15 +531,45 @@ class TestWindow(QMainWindow):
         popup: NumberSelector = NumberSelector(self, remaining_options, global_pos, cell_size)
         if popup.exec():
             new_number: int = popup.selected_number
+            old_value: int | None = self.values.get((row, col))
             if new_number == self.values.get((row, col)):
                 del self.values[(row, col)]
+                self.history.append(((row, col), old_value if old_value is not None else 0))
             else:
                 self.values[(row, col)] = new_number
+                self.history.append(((row, col), old_value if old_value is not None else 0))
             self.view.set_data(
                 self.view.rows, self.view.cols, self.values,
                 self.view.thick_borders, self.immutable_cells,
                 self.pattern_membership,
             )
+
+    def undo(self) -> None:
+        if not self.history:
+            return
+        pos, old_value = self.history.pop()
+        if old_value == 0:
+            self.values.pop(pos, None)
+        else:
+            self.values[pos] = old_value
+        self.view.set_data(
+            self.view.rows, self.view.cols, self.values,
+            self.view.thick_borders, self.immutable_cells,
+            self.pattern_membership,
+        )
+
+    def reset_grid(self) -> None:
+        keys_to_remove: list[tuple[int, int]] = [
+            pos for pos in self.values if pos not in self.immutable_cells
+        ]
+        for key in keys_to_remove:
+            del self.values[key]
+        self.history.clear()
+        self.view.set_data(
+            self.view.rows, self.view.cols, self.values,
+            self.view.thick_borders, self.immutable_cells,
+            self.pattern_membership,
+        )
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ class Controller:
     def __init__(self, file_path: str) -> None:
         self.model: Grid = Grid.from_json(file_path)
         self.view: MainWindow = MainWindow(self)
+        self._history: list[tuple[int, int, int]] = []
         self.update_view()
 
     def update_view(self) -> None:
@@ -96,5 +97,23 @@ class Controller:
 
         if popup.exec():
             new_number: int = popup.selected_number
+            self._history.append((target_cell.x, target_cell.y, target_cell.value))
             target_cell.set_value(new_number)
             self.update_view()
+
+    def undo(self) -> None:
+        if not self._history:
+            return
+        x, y, old_value = self._history.pop()
+        cell: Cell | None = self.model.get_cell(x, y)
+        if cell is not None and not cell.immuable:
+            cell.value = old_value
+            self.update_view()
+
+    def reset_grid(self) -> None:
+        for pattern in self.model.patterns:
+            for cell in pattern.cells:
+                if not cell.immuable:
+                    cell.set_value(0)
+        self._history.clear()
+        self.update_view()
