@@ -17,83 +17,89 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import Qt, QRect, pyqtSignal
 
-class VueGrille(QWidget):
+#The GridView class renders the game grid, handles user clicks, and displays cell values and borders.
+class GridView(QWidget):
     cell_clicked = pyqtSignal(int, int)
 
+    # Initializes the grid view with default settings (0 rows, 0 cols, empty values, no borders).
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.lignes = 0
-        self.colonnes = 0
-        self.taille_case = 50
-        self.valeurs = {}
-        self.bords_epais = []
+        self.rows = 0
+        self.cols = 0
+        self.cell_size = 50
+        self.values = {}
+        self.thick_borders = []
 
-    def set_donnees(self, lignes, colonnes, valeurs, bords_epais):
-        self.lignes = lignes
-        self.colonnes = colonnes
-        self.valeurs = valeurs
-        self.bords_epais = bords_epais
-        self.setMinimumSize(self.colonnes * self.taille_case + 20, self.lignes * self.taille_case + 20)
+    # Sets the grid data (rows, cols, cell values, and thick borders) and updates the display.
+    def set_data(self, rows, cols, values, thick_borders):
+        self.rows = rows
+        self.cols = cols
+        self.values = values
+        self.thick_borders = thick_borders
+        self.setMinimumSize(self.cols * self.cell_size + 20, self.rows * self.cell_size + 20)
         self.update()
 
+    # Handles mouse click events to determine which cell was clicked and emits a signal with the cell coordinates.
     def mousePressEvent(self, event):
         x_rel = event.pos().x() - 10
         y_rel = event.pos().y() - 10
-        colonne = x_rel // self.taille_case
-        ligne = y_rel // self.taille_case
-        if 0 <= ligne < self.lignes and 0 <= colonne < self.colonnes:
-            local_x = x_rel % self.taille_case
-            local_y = y_rel % self.taille_case
-            marge = 4
-            if (marge <= local_x <= self.taille_case - marge) and (marge <= local_y <= self.taille_case - marge):
-                self.cell_clicked.emit(colonne, ligne)
+        col = x_rel // self.cell_size
+        row = y_rel // self.cell_size
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            local_x = x_rel % self.cell_size
+            local_y = y_rel % self.cell_size
+            margin = 4
+            if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
+                self.cell_clicked.emit(col, row)
 
+    # Paints the grid, cell values, and thick borders based on the current data. Uses anti-aliasing for smoother visuals.
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         painter.fillRect(self.rect(), Qt.GlobalColor.white)
 
-        stylo_fin = QPen(QColor(200, 200, 200), 1)
-        painter.setPen(stylo_fin)
+        thin_pen = QPen(QColor(200, 200, 200), 1)
+        painter.setPen(thin_pen)
 
-        for i in range(self.lignes):
-            for j in range(self.colonnes):
-                x = j * self.taille_case + 10
-                y = i * self.taille_case + 10
-                painter.drawRect(x, y, self.taille_case, self.taille_case)
+        for i in range(self.rows):
+            for j in range(self.cols):
+                x = j * self.cell_size + 10
+                y = i * self.cell_size + 10
+                painter.drawRect(x, y, self.cell_size, self.cell_size)
 
         painter.setPen(QPen(Qt.GlobalColor.black))
         font = QFont("Arial", 16)
         painter.setFont(font)
 
-        for (i, j), valeur in self.valeurs.items():
-            x = j * self.taille_case + 10
-            y = i * self.taille_case + 10
-            rect = QRect(x, y, self.taille_case, self.taille_case)
-            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(valeur))
+        for (i, j), value in self.values.items():
+            x = j * self.cell_size + 10
+            y = i * self.cell_size + 10
+            rect = QRect(x, y, self.cell_size, self.cell_size)
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(value))
 
-        stylo_epais = QPen(Qt.GlobalColor.black, 4)
-        painter.setPen(stylo_epais)
+        thick_pen = QPen(Qt.GlobalColor.black, 4)
+        painter.setPen(thick_pen)
 
-        for bord in self.bords_epais:
-            x1 = bord[0] * self.taille_case + 10
-            y1 = bord[1] * self.taille_case + 10
-            x2 = bord[2] * self.taille_case + 10
-            y2 = bord[3] * self.taille_case + 10
+        for border in self.thick_borders:
+            x1 = border[0] * self.cell_size + 10
+            y1 = border[1] * self.cell_size + 10
+            x2 = border[2] * self.cell_size + 10
+            y2 = border[3] * self.cell_size + 10
             painter.drawLine(x1, y1, x2, y2)
 
 
-class FenetrePrincipale(QMainWindow):
+# The MainWindow class sets up the main application window, integrates the GridView, and connects user interactions to the controller.
+class MainWindow(QMainWindow):
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
-        self.setWindowTitle("Néonaure")
-        self.vue_grille = VueGrille(self)
-        self.setCentralWidget(self.vue_grille)
-        self.vue_grille.cell_clicked.connect(self.controller.handle_click)
+        self.setWindowTitle("Neonaure")
+        self.grid_view = GridView(self)
+        self.setCentralWidget(self.grid_view)
+        self.grid_view.cell_clicked.connect(self.controller.handle_click)
 
-data_test = {
+test_data = {
     "motif1": [[0,0,0], [1,0,0], [0,1,0], [1,1,3], [2,1,0]],
     "motif2": [[2,0,5], [3,0,0], [4,0,0], [4,1,0], [5,0,0]],
     "motif3": [[6,0,0], [5,1,0], [6,1,4], [6,2,0], [7,0,0]],
@@ -111,53 +117,55 @@ data_test = {
     "motif15": [[5,5,0]]
 }
 
-
-def preparer_donnees_test(data):
-    valeurs = {}
-    bords_epais = []
-    lignes = 8
-    colonnes = 8
+# Prepares test data for the grid view by organizing cell values and determining where thick borders should be drawn.
+def prepare_test_data(data):
+    values = {}
+    thick_borders = []
+    rows = 8
+    cols = 8
     
-    appartenance_motif = {}
-    for nom_motif, cellules in data.items():
-        for l, c, v in cellules:
-            appartenance_motif[(l, c)] = nom_motif
+    pattern_membership = {}
+    for pattern_name, cells in data.items():
+        for r, c, v in cells:
+            pattern_membership[(r, c)] = pattern_name
             if v > 0:
-                valeurs[(l, c)] = v
+                values[(r, c)] = v
                 
-    for l in range(lignes):
-        for c in range(colonnes):
-            motif_courant = appartenance_motif.get((l, c))
+    for r in range(rows):
+        for c in range(cols):
+            current_pattern = pattern_membership.get((r, c))
             
-            if l == 0 or appartenance_motif.get((l-1, c)) != motif_courant:
-                bords_epais.append((c, l, c+1, l))
-            if l == lignes - 1 or appartenance_motif.get((l+1, c)) != motif_courant:
-                bords_epais.append((c, l+1, c+1, l+1))
-            if c == 0 or appartenance_motif.get((l, c-1)) != motif_courant:
-                bords_epais.append((c, l, c, l+1))
-            if c == colonnes - 1 or appartenance_motif.get((l, c+1)) != motif_courant:
-                bords_epais.append((c+1, l, c+1, l+1))
+            if r == 0 or pattern_membership.get((r-1, c)) != current_pattern:
+                thick_borders.append((c, r, c+1, r))
+            if r == rows - 1 or pattern_membership.get((r+1, c)) != current_pattern:
+                thick_borders.append((c, r+1, c+1, r+1))
+            if c == 0 or pattern_membership.get((r, c-1)) != current_pattern:
+                thick_borders.append((c, r, c, r+1))
+            if c == cols - 1 or pattern_membership.get((r, c+1)) != current_pattern:
+                thick_borders.append((c+1, r, c+1, r+1))
                 
-    return lignes, colonnes, valeurs, bords_epais
+    return rows, cols, values, thick_borders
 
 
-class FenetreTest(QMainWindow):
+# TestWindow is a simple window for testing the GridView component with predefined data. It prints cell clicks to the console.
+class TestWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Test Vue Néonaure")
-        self.vue = VueGrille(self)
-        self.setCentralWidget(self.vue)
+        self.setWindowTitle("Neonaure View Test")
+        self.view = GridView(self)
+        self.setCentralWidget(self.view)
         
-        l, c, val, bords = preparer_donnees_test(data_test)
-        self.vue.set_donnees(l, c, val, bords)
-        self.vue.cell_clicked.connect(self.handle_click_test)
+        r, c, val, borders = prepare_test_data(test_data)
+        self.view.set_data(r, c, val, borders)
+        self.view.cell_clicked.connect(self.handle_test_click)
 
-    def handle_click_test(self, colonne, ligne):
-        print(f"Clic de test détecté : colonne {colonne}, ligne {ligne}")
+    def handle_test_click(self, col, row):
+        print(f"Test click detected: col {col}, row {row}")
 
+# The main block initializes the application, sets a basic style, creates the test window, and starts the event loop.
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyleSheet("QWidget { background-color: white; color: black; }")
-    fenetre = FenetreTest()
-    fenetre.show()
+    window = TestWindow()
+    window.show()
     sys.exit(app.exec())
