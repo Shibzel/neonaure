@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushBu
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
 
+from neonaure.neonaure.controller import Controller
+
 # NumberSelector is a popup dialog that appears when the user clicks on an empty cell, allowing them to select a number from the valid options for that cell's pattern.
 class NumberSelector(QDialog):
     def __init__(self, parent, options, cell_global_pos, cell_size):
@@ -63,32 +65,37 @@ class NumberSelector(QDialog):
         self.selected_number = n
         self.accept()
 
-# The GridView class is responsible for rendering the game grid, including cells, numbers, and borders. It also handles mouse events to detect clicks on cells and hover effects.
+"""
+The GridView class is responsible for rendering the game grid, including cells, numbers, and borders. 
+It also handles mouse events to detect clicks on cells and hover effects.
+"""
 class GridView(QWidget):
-    cell_clicked = pyqtSignal(int, int)
+    cell_clicked: pyqtSignal = pyqtSignal(int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.rows = 0
-        self.cols = 0
-        self.cell_size = 50
-        self.values = {}
-        self.thick_borders = []
-        self.immutable_cells = set()
+        self.rows: int = 0
+        self.cols: int = 0
+        self.cell_size: int = 50
+        self.values: dict = {}
+        self.thick_borders: list = []
+        self.immutable_cells: set = set()
         self.setMouseTracking(True)
-        self.hovered_row = -1
-        self.hovered_col = -1
+        self.hovered_row: int = -1
+        self.hovered_col: int = -1
 
     def set_data(self, rows, cols, values, thick_borders, immutable_cells):
-        self.rows = rows
-        self.cols = cols
-        self.values = values
-        self.thick_borders = thick_borders
-        self.immutable_cells = immutable_cells
+        self.rows: int = rows
+        self.cols: int = cols
+        self.values: dict = values
+        self.thick_borders: list = thick_borders
+        self.immutable_cells: set = immutable_cells
         self.setMinimumSize(self.cols * self.cell_size + 20, self.rows * self.cell_size + 20)
         self.update()
 
-    # Mouse event handlers to detect clicks and hover effects on cells
+    """
+    Mouse event handlers to detect clicks and hover effects on cells
+    """
     def mouseMoveEvent(self, event):
         x_rel = event.pos().x() - 10
         y_rel = event.pos().y() - 10
@@ -106,13 +113,17 @@ class GridView(QWidget):
                 self.hovered_col = -1
                 self.update()
 
-    # When the mouse leaves the grid area, reset hover state
+    """
+    When the mouse leaves the grid area, reset hover state
+    """
     def leaveEvent(self, event):
         self.hovered_row = -1
         self.hovered_col = -1
         self.update()
 
-    # When a cell is clicked, emit the cell_clicked signal with the column and row indices
+    """
+    When a cell is clicked, emit the cell_clicked signal with the column and row indices
+    """
     def mousePressEvent(self, event):
         x_rel = event.pos().x() - 10
         y_rel = event.pos().y() - 10
@@ -125,60 +136,67 @@ class GridView(QWidget):
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
                 self.cell_clicked.emit(col, row)
 
-    # The paintEvent method is responsible for drawing the grid, including cells, numbers, and borders. It uses QPainter to render the visual elements based on the current state of the grid.
+    """
+    The paintEvent method is responsible for drawing the grid, including cells, numbers, and borders. 
+    It uses QPainter to render the visual elements based on the current state of the grid.
+    """
     def paintEvent(self, event):
-        painter = QPainter(self)
+        painter: QPainter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         painter.fillRect(self.rect(), Qt.GlobalColor.white)
 
         for i in range(self.rows):
             for j in range(self.cols):
-                x = j * self.cell_size + 10
-                y = i * self.cell_size + 10
-                
+                x: int = j * self.cell_size + 10
+                y: int = i * self.cell_size + 10
+
                 if (i, j) in self.immutable_cells:
                     painter.fillRect(x, y, self.cell_size, self.cell_size, QColor(200, 200, 200))
                 elif i == self.hovered_row and j == self.hovered_col:
                     painter.fillRect(x, y, self.cell_size, self.cell_size, QColor(240, 240, 240))
-                    
-                thin_pen = QPen(QColor(200, 200, 200), 1)
+
+                thin_pen: QPen = QPen(QColor(200, 200, 200), 1)
                 painter.setPen(thin_pen)
                 painter.drawRect(x, y, self.cell_size, self.cell_size)
 
         painter.setPen(QPen(Qt.GlobalColor.black))
-        font = QFont("Arial", 16)
+        font: QFont = QFont("Arial", 16)
         painter.setFont(font)
 
         for (i, j), value in self.values.items():
-            x = j * self.cell_size + 10
-            y = i * self.cell_size + 10
-            rect = QRect(x, y, self.cell_size, self.cell_size)
+            x: int = j * self.cell_size + 10
+            y: int = i * self.cell_size + 10
+            rect: QRect = QRect(x, y, self.cell_size, self.cell_size)
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(value))
 
-        thick_pen = QPen(Qt.GlobalColor.black, 4)
+        thick_pen: QPen = QPen(Qt.GlobalColor.black, 4)
         painter.setPen(thick_pen)
 
         for border in self.thick_borders:
-            x1 = border[0] * self.cell_size + 10
-            y1 = border[1] * self.cell_size + 10
-            x2 = border[2] * self.cell_size + 10
-            y2 = border[3] * self.cell_size + 10
+            x1: int = border[0] * self.cell_size + 10
+            y1: int = border[1] * self.cell_size + 10
+            x2: int = border[2] * self.cell_size + 10
+            y2: int = border[3] * self.cell_size + 10
             painter.drawLine(x1, y1, x2, y2)
 
 
-# The MainWindow class is the main application window that contains the GridView. It initializes the GUI and connects the cell_clicked signal from the GridView to the controller's handle_click method, allowing user interactions to be processed by the controller.
+"""
+The MainWindow class is the main application window that contains the GridView. 
+It initializes the GUI and connects the cell_clicked signal from the GridView to 
+the controller's handle_click method, allowing user interactions to be processed by the controller.
+"""
 class MainWindow(QMainWindow):
     def __init__(self, controller):
         super().__init__()
-        self.controller = controller
+        self.controller: Controller = controller
         self.setWindowTitle("Neonaure")
         self.grid_view = GridView(self)
         self.setCentralWidget(self.grid_view)
         self.grid_view.cell_clicked.connect(self.controller.handle_click)
 
 
-test_data = {
+test_data: dict[str, list[list[int]]] = {
     "motif1": [[0,0,0], [1,0,0], [0,1,0], [1,1,3], [2,1,0]],
     "motif2": [[2,0,5], [3,0,0], [4,0,0], [4,1,0], [5,0,0]],
     "motif3": [[6,0,0], [5,1,0], [6,1,4], [6,2,0], [7,0,0]],
@@ -196,15 +214,18 @@ test_data = {
     "motif15": [[5,5,0]]
 }
 
-# prepare_test_data is a helper function that processes the test data to extract values, thick borders, immutable cells, and pattern membership information.
+"""
+prepare_test_data is a helper function that processes the test data to extract values, 
+thick borders, immutable cells, and pattern membership information.
+"""
 def prepare_test_data(data):
-    values = {}
-    thick_borders = []
-    immutable_cells = set()
-    rows = 8
-    cols = 8
+    values: dict[tuple[int, int], int] = {}
+    thick_borders: list[tuple[int, int, int, int]] = []
+    immutable_cells: set[tuple[int, int]] = set()
+    rows: int = 8
+    cols: int = 8
     
-    pattern_membership = {}
+    pattern_membership: dict[tuple[int, int], str] = {}
     for pattern_name, cells in data.items():
         for r, c, v in cells:
             pattern_membership[(r, c)] = pattern_name
@@ -227,58 +248,68 @@ def prepare_test_data(data):
                 
     return rows, cols, values, thick_borders, immutable_cells, pattern_membership
 
-# The TestWindow class is a simple test application that initializes the GridView with prepared test data and allows the user to interact with the grid. It demonstrates how the view can be used independently for testing purposes.
+""" 
+The TestWindow class is a simple test application that initializes the GridView 
+with prepared test data and allows the user to interact with the grid. 
+It demonstrates how the view can be used independently for testing purposes. 
+"""
 class TestWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Neonaure View Test")
-        self.view = GridView(self)
+        self.view: GridView = GridView(self)
         self.setCentralWidget(self.view)
         
+        r: int
+        c: int
+        val: dict[tuple[int, int], int]
+        borders: list[tuple[int, int, int, int]]
+        immutables: set[tuple[int, int]]
+        p_membership: dict[tuple[int, int], str]
         r, c, val, borders, immutables, p_membership = prepare_test_data(test_data)
         self.view.set_data(r, c, val, borders, immutables)
-        self.pattern_membership = p_membership
-        self.immutable_cells = immutables
-        self.values = val
+        self.pattern_membership: dict[tuple[int, int], str] = p_membership
+        self.immutable_cells: set[tuple[int, int]] = immutables
+        self.values: dict[tuple[int, int], int] = val
         self.view.cell_clicked.connect(self.handle_test_click)
 
-    def handle_test_click(self, col, row):
+    def handle_test_click(self, col: int, row: int):
         if (row, col) in self.immutable_cells:
             return
 
-        current_pattern = self.pattern_membership.get((row, col))
+        current_pattern: str = self.pattern_membership.get((row, col))
         if not current_pattern:
             return
             
-        pattern_cells = [(r, c) for (r, c), p in self.pattern_membership.items() if p == current_pattern]
-        pattern_size = len(pattern_cells)
+        pattern_cells: list[tuple[int, int]] = [(r, c) for (r, c), p in self.pattern_membership.items() if p == current_pattern]
+        pattern_size: int = len(pattern_cells)
         
-        possible_numbers = set(range(1, pattern_size + 1))
-        used_numbers = {
+        possible_numbers: set[int] = set(range(1, pattern_size + 1))
+        used_numbers: set[int] = {
             self.values.get((r, c)) 
             for r, c in pattern_cells 
             if self.values.get((r, c)) is not None 
             and (r, c) in self.immutable_cells 
             and (r, c) != (row, col)
         }
-        remaining_options = sorted(list(possible_numbers - used_numbers))
+        remaining_options: list[int] = sorted(list(possible_numbers - used_numbers))
         
         if not remaining_options:
             return
             
-        cell_size = self.view.cell_size
-        local_pos = QPoint(col * cell_size, row * cell_size)
-        global_pos = self.view.mapToGlobal(local_pos)
+        cell_size: int = self.view.cell_size
+        local_pos: QPoint = QPoint(col * cell_size, row * cell_size)
+        global_pos: QPoint = self.view.mapToGlobal(local_pos)
 
-        popup = NumberSelector(self, remaining_options, global_pos, cell_size)
+        popup: NumberSelector = NumberSelector(self, remaining_options, global_pos, cell_size)
         if popup.exec():
-            new_number = popup.selected_number
+            new_number: int = popup.selected_number
             self.values[(row, col)] = new_number
             self.view.set_data(self.view.rows, self.view.cols, self.values, self.view.thick_borders, self.immutable_cells)
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app: QApplication = QApplication(sys.argv)
     app.setStyleSheet("QWidget { background-color: white; color: black; }")
-    window = TestWindow()
+    window: TestWindow = TestWindow()
     window.show()
     sys.exit(app.exec())
