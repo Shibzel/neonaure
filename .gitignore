@@ -1,5 +1,9 @@
 # Spécifique au projet
 data/saves/*
+rule
+AGENTS.md
+tests/
+compte_rendu/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -221,12 +225,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-
-rule
-AGENTS.md
-tests/
-compte_rendu/
-
-
-
