@@ -2,7 +2,7 @@
 Neonaure - Model module
 
 Author(s):
-    - Jean-François L. (contact@shibzel.mes)
+    - Jean-François L. (contact@shibzel.me)
 
 This module contains the core data structures and business logic:
 - Grid, Motif, and Cell classes to represent the game state.
