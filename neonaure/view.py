@@ -144,6 +144,10 @@ class FenetreTest(QMainWindow):
         
         l, c, val, bords = preparer_donnees_test(data_test)
         self.vue.set_donnees(l, c, val, bords)
+        self.vue.cell_clicked.connect(self.handle_click_test)
+
+    def handle_click_test(self, colonne, ligne):
+        print(f"Clic de test détecté : colonne {colonne}, ligne {ligne}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
