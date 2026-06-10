@@ -48,9 +48,11 @@ class Cell:
         return self.value == other.value
 
     def to_list(self) -> list:
+        """Returns the cell data as a list [x, y, value, immuable]."""
         return [self.x, self.y, self.value, self.immuable]
 
     def set_value(self, value: int) -> None:
+        """Sets the cell value. Raises CellIsImmuable if the cell cannot be modified."""
         if self.immuable:
             raise CellIsImmuable(f"Cell `{self}` is immuable cannot be edited.")
         self.value = value
@@ -64,9 +66,11 @@ class Pattern:
         self.cells = cells or []
 
     def to_list(self) -> list:
+        """Returns the pattern data as a list of cell lists."""
         return [cell.to_list() for cell in self.cells]
 
     def set_cell(self, x: int, y: int, value: int, immuable: bool = False) -> None:
+        """Updates the value of an existing cell, or adds a new cell if absent."""
         for cell in self.cells:
             if cell.x == x and cell.y == y:
                 cell.set_value(value)
@@ -76,6 +80,7 @@ class Pattern:
 
     @classmethod
     def from_raw_cells(cls, name: str, raw_cells: list) -> "Pattern":
+        """Creates a Pattern instance from a raw list of cell data."""
         instance = cls(name)
         for cell in raw_cells:
             # Logique d'immuabilité :
@@ -106,14 +111,18 @@ class Grid:
         self._fill_matrix()
 
     def to_dict(self) -> dict:
+        """Returns the grid data as a dictionary keyed by pattern names.
+        The result should should be able te be converted into JSON objects."""
         return {pattern.name: pattern.to_list() for pattern in self.patterns}
 
     def _fill_matrix(self) -> None:
+        """Populates the 2D matrix with cell references based on their coordinates."""
         for pattern in self.patterns:
             for cell in pattern.cells:
                 self.matrix[cell.y][cell.x] = cell
 
     def _add_pattern(self, pattern: Pattern) -> None:
+        """Adds a pattern to the grid. Raises PatternAlreadyLoaded if the name exists."""
         for p in self.patterns:
             if p.name == pattern.name:
                 raise PatternAlreadyLoaded(
@@ -122,6 +131,7 @@ class Grid:
         self.patterns.append(pattern)
 
     def get_dimensions(self) -> tuple[int, int]:
+        """Calculates and returns the grid dimensions (width, height)."""
         if (self.height is None) or (self.width is None):
             self.height = self.width = 0
             for pattern in self.patterns:
@@ -149,6 +159,7 @@ class Grid:
 
     @classmethod
     def from_data(cls, data: dict) -> "Grid":
+        """Creates a Grid instance from a dictionary of pattern data."""
         patterns: list = []
         for key, val in data.items():
             # La clé se doit de commencer par "motif"
@@ -159,10 +170,12 @@ class Grid:
 
     @classmethod
     def from_json(cls, file_path: str):
+        """Creates a Grid instance from a JSON file path."""
         data: dict = load_json(file_path)
         return cls.from_data(data)
 
     def save_grid_to_json(self, file_path: str) -> None:
+        """Saves the current grid state to a JSON file."""
         save_json(file_path, self.to_dict())
 
 
@@ -218,12 +231,7 @@ class Solver:
         return list(possible_values)
 
     def solve_grid(self) -> bool:
-        """
-        Uses a "backtracking" algorithm etc etc TODO
-        Things to consider :
-            - This method fills the grid that has been initialized
-            - TODO
-        """
+        """Fills the grid using backtracking. Returns True if solved."""
         # Gather all empty cells (nodes with no color yet)
         empty_cells: list = [
             cell for pattern in self.grid.patterns
