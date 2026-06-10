@@ -37,10 +37,16 @@ class VueGrille(QWidget):
         self.update()
 
     def mousePressEvent(self, event):
-        colonne = (event.pos().x() - 10) // self.taille_case
-        ligne = (event.pos().y() - 10) // self.taille_case
+        x_rel = event.pos().x() - 10
+        y_rel = event.pos().y() - 10
+        colonne = x_rel // self.taille_case
+        ligne = y_rel // self.taille_case
         if 0 <= ligne < self.lignes and 0 <= colonne < self.colonnes:
-            self.cell_clicked.emit(colonne, ligne)
+            local_x = x_rel % self.taille_case
+            local_y = y_rel % self.taille_case
+            marge = 4
+            if (marge <= local_x <= self.taille_case - marge) and (marge <= local_y <= self.taille_case - marge):
+                self.cell_clicked.emit(colonne, ligne)
 
     def paintEvent(self, event):
         painter = QPainter(self)
