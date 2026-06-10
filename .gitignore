@@ -221,3 +221,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Adrien
+rule
+AGENTS.md
+tests/
+compte_rendu/
+
+
