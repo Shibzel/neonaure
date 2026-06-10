@@ -90,72 +90,60 @@ class Pattern:
 class Grid:
     """Represents the Neonaure game grid, including dimensions, cells, and patterns."""
 
-    def __init__(
-        self,
-        height: int | None = None,
-        width: int | None = None,
-        patterns: list[Pattern] | None = None,
-    ) -> None:
-        self.height = height
-        self.width = width
-        self.patterns = patterns or []
+    def __init__(self, patterns: list[Pattern]) -> None:
+        self.patterns = []
+        for pattern in patterns:
+            self._add_pattern(pattern)
+        self.height = self.width = None
+        x, y = self.get_dimensions()
+        self.matrix = [[None for _ in range(x)] for _ in range(y)]
+        self._fill_matrix()
 
     def to_dict(self) -> dict:
         return {pattern.name: pattern.to_list() for pattern in self.patterns}
+
+    def _fill_matrix(self) -> None:
+        for pattern in self.patterns:
+            for cell in pattern.cells:
+                self.matrix[cell.y][cell.x] = cell
+
+    def _add_pattern(self, pattern: Pattern) -> None:
+        for p in self.patterns:
+            if p.name == pattern.name:
+                raise PatternAlreadyLoaded(
+                    f"Pattern with name '{pattern.name}' is already loaded."
+                )
+        self.patterns.append(pattern)
 
     def get_dimensions(self) -> tuple[int, int]:
         if (self.height is None) or (self.width is None):
             self.height = self.width = 0
             for pattern in self.patterns:
                 for cell in pattern.cells:
-                    if cell.x > self.height:
-                        self.height = cell.x + 1
-                    if cell.y > self.width:
-                        self.width = cell.y + 1
+                    if cell.x > self.width:
+                        self.width = cell.x + 1
+                    if cell.y > self.height:
+                        self.height = cell.y + 1
         return self.width, self.height
 
     def neighbours(self, x: int, y: int) -> list:
         """Returns a list of the closest neighbours of a grid."""
         raise NotImplementedError
 
-    def _check_pattern(self, pattern_name):
-        for pattern in self.patterns:
-            if pattern.name == pattern_name:
-                raise PatternAlreadyLoaded(
-                    f"Pattern with name '{pattern_name}' is already loaded."
-                )
-
-    def add_pattern(self, pattern: Pattern) -> None:
-        self._check_pattern(pattern.name)
-        self.patterns.append(pattern)
-
-    def add_pattern_raw(self, name: str, pattern_raw: list) -> None:
-        self._check_pattern(name)
-        pattern = Pattern.from_raw_cells(name, pattern_raw)
-        self.patterns.append(pattern)
-
-    def load_grid(self, data: dict[str, list]) -> None:
-        # TODO: Vérifier l'intégrité des données fournies
+    @classmethod
+    def from_data(cls, data: dict) -> "Grid":
+        patterns = []
         for key, val in data.items():
             # La clé se doit de commencer par "motif"
             if key.startswith(PATTERN_KEY_STARTS_WITH):
-                self.add_pattern_raw(key, val)
-
-    def load_grid_from_json(self, file_path: str) -> None:
-        data: dict = load_json(file_path)
-        self.load_grid(data)
-
-    @classmethod
-    def grid_without_dimensions(cls, data: dict) -> "Grid":
-        instance = cls()
-        instance.load_grid(data)
-        instance.get_dimensions()
+                patterns.append(Pattern.from_raw_cells(key, val))
+        instance = cls(patterns)
         return instance
 
     @classmethod
-    def from_json_without_dimensions(cls, file_path: str):
+    def from_json(cls, file_path: str):
         data: dict = load_json(file_path)
-        return cls.grid_without_dimensions(data)
+        return cls.from_data(data)
 
     def save_grid_to_json(self, file_path: str) -> None:
         save_json(file_path, self.to_dict())
@@ -164,12 +152,16 @@ class Grid:
 class Solver:
     """Solves the Neonaure grid. TODO"""
 
-    def __init__(self) -> None:
-        raise NotADirectoryError
+    def __init__(self, grid: Grid) -> None:
+        self.grid = grid
 
 
 if __name__ == "__main__":
     data = load_json("./data/grids/default.json")
     print(data)
-    grid = Grid.grid_without_dimensions(data)
+    grid = Grid.from_data(data)
     print(f"h: {grid.height},  w: {grid.width}\n", grid.to_dict())
+    for x in grid.matrix:
+        for y in x:
+            print(y.value, end="")
+        print("")
