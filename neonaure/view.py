@@ -15,9 +15,11 @@ forwarded to the controller.
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
-from PyQt6.QtCore import Qt, QRect
+from PyQt6.QtCore import Qt, QRect, pyqtSignal
 
 class VueGrille(QWidget):
+    cell_clicked = pyqtSignal(int, int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.lignes = 0
@@ -33,6 +35,12 @@ class VueGrille(QWidget):
         self.bords_epais = bords_epais
         self.setMinimumSize(self.colonnes * self.taille_case + 20, self.lignes * self.taille_case + 20)
         self.update()
+
+    def mousePressEvent(self, event):
+        colonne = (event.pos().x() - 10) // self.taille_case
+        ligne = (event.pos().y() - 10) // self.taille_case
+        if 0 <= ligne < self.lignes and 0 <= colonne < self.colonnes:
+            self.cell_clicked.emit(colonne, ligne)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -69,6 +77,15 @@ class VueGrille(QWidget):
             y2 = bord[3] * self.taille_case + 10
             painter.drawLine(x1, y1, x2, y2)
 
+
+class FenetrePrincipale(QMainWindow):
+    def __init__(self, controller):
+        super().__init__()
+        self.controller = controller
+        self.setWindowTitle("Néonaure")
+        self.vue_grille = VueGrille(self)
+        self.setCentralWidget(self.vue_grille)
+        self.vue_grille.cell_clicked.connect(self.controller.handle_click)
 
 data_test = {
     "motif1": [[0,0,0], [1,0,0], [0,1,0], [1,1,3], [2,1,0]],
