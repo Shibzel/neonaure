@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushBu
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint
 
+# NumberSelector is a popup dialog that appears when the user clicks on an empty cell, allowing them to select a number from the valid options for that cell's pattern.
 class NumberSelector(QDialog):
     def __init__(self, parent, options, cell_global_pos, cell_size):
         super().__init__(parent)
@@ -62,7 +63,7 @@ class NumberSelector(QDialog):
         self.selected_number = n
         self.accept()
 
-
+# The GridView class is responsible for rendering the game grid, including cells, numbers, and borders. It also handles mouse events to detect clicks on cells and hover effects.
 class GridView(QWidget):
     cell_clicked = pyqtSignal(int, int)
 
@@ -87,6 +88,7 @@ class GridView(QWidget):
         self.setMinimumSize(self.cols * self.cell_size + 20, self.rows * self.cell_size + 20)
         self.update()
 
+    # Mouse event handlers to detect clicks and hover effects on cells
     def mouseMoveEvent(self, event):
         x_rel = event.pos().x() - 10
         y_rel = event.pos().y() - 10
@@ -104,11 +106,13 @@ class GridView(QWidget):
                 self.hovered_col = -1
                 self.update()
 
+    # When the mouse leaves the grid area, reset hover state
     def leaveEvent(self, event):
         self.hovered_row = -1
         self.hovered_col = -1
         self.update()
 
+    # When a cell is clicked, emit the cell_clicked signal with the column and row indices
     def mousePressEvent(self, event):
         x_rel = event.pos().x() - 10
         y_rel = event.pos().y() - 10
@@ -121,6 +125,7 @@ class GridView(QWidget):
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
                 self.cell_clicked.emit(col, row)
 
+    # The paintEvent method is responsible for drawing the grid, including cells, numbers, and borders. It uses QPainter to render the visual elements based on the current state of the grid.
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -162,6 +167,7 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
+# The MainWindow class is the main application window that contains the GridView. It initializes the GUI and connects the cell_clicked signal from the GridView to the controller's handle_click method, allowing user interactions to be processed by the controller.
 class MainWindow(QMainWindow):
     def __init__(self, controller):
         super().__init__()
@@ -190,7 +196,7 @@ test_data = {
     "motif15": [[5,5,0]]
 }
 
-
+# prepare_test_data is a helper function that processes the test data to extract values, thick borders, immutable cells, and pattern membership information.
 def prepare_test_data(data):
     values = {}
     thick_borders = []
@@ -221,7 +227,7 @@ def prepare_test_data(data):
                 
     return rows, cols, values, thick_borders, immutable_cells, pattern_membership
 
-
+# The TestWindow class is a simple test application that initializes the GridView with prepared test data and allows the user to interact with the grid. It demonstrates how the view can be used independently for testing purposes.
 class TestWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -248,7 +254,13 @@ class TestWindow(QMainWindow):
         pattern_size = len(pattern_cells)
         
         possible_numbers = set(range(1, pattern_size + 1))
-        used_numbers = {self.values.get((r, c)) for r, c in pattern_cells if self.values.get((r, c)) is not None and (r, c) != (row, col)}
+        used_numbers = {
+            self.values.get((r, c)) 
+            for r, c in pattern_cells 
+            if self.values.get((r, c)) is not None 
+            and (r, c) in self.immutable_cells 
+            and (r, c) != (row, col)
+        }
         remaining_options = sorted(list(possible_numbers - used_numbers))
         
         if not remaining_options:
@@ -263,7 +275,6 @@ class TestWindow(QMainWindow):
             new_number = popup.selected_number
             self.values[(row, col)] = new_number
             self.view.set_data(self.view.rows, self.view.cols, self.values, self.view.thick_borders, self.immutable_cells)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

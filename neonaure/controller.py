@@ -8,6 +8,7 @@ from PyQt6.QtCore import QPoint
 from .view import MainWindow, NumberSelector
 from .model import Grid
 
+# The Controller class is responsible for managing the game state and handling user interactions. It initializes the model and view, updates the view based on the model's state, and processes user clicks on the grid to update the model accordingly.
 class Controller:
     def __init__(self, file_path: str):
         self.model = Grid.from_json(file_path)
@@ -45,7 +46,7 @@ class Controller:
 
         self.view.grid_view.set_data(rows, cols, values, thick_borders)
 
-    def handle_click(self, col: int, row: int):
+    # The handle_click method processes user clicks on the grid.
         target_pattern = None
         target_cell = None
         
@@ -63,7 +64,13 @@ class Controller:
 
         pattern_size = len(target_pattern.cells)
         possible_numbers = set(range(1, pattern_size + 1))
-        used_numbers = {c.value for c in target_pattern.cells if c.value != 0 and c != target_cell}
+        used_numbers = {
+            c.value 
+            for c in target_pattern.cells 
+            if c.value != 0 
+            and c.immuable 
+            and c != target_cell
+        }
         remaining_options = sorted(list(possible_numbers - used_numbers))
 
         if not remaining_options:
