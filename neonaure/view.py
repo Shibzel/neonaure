@@ -29,6 +29,7 @@ class NumberSelector(QDialog):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(2)
 
+        # Scale button size and font proportionally to the current cell size.
         btn_size = max(25, int(cell_size * 0.7))
         font_size = max(8, int(cell_size * 0.3))
 
@@ -88,6 +89,7 @@ class GridView(QWidget):
         self.hovered_row: int = -1
         self.hovered_col: int = -1
 
+    # Calculate the optimal cell size to fit the grid within the widget while keeping cells square.
     def _compute_cell_size(self) -> int:
         if self.rows == 0 or self.cols == 0:
             return 50
@@ -97,18 +99,34 @@ class GridView(QWidget):
         cell_h = available_h // self.rows
         return max(20, min(cell_w, cell_h))
 
+    # Center the grid inside the widget by computing horizontal and vertical offsets.
     def _compute_offset(self):
         grid_w = self.cols * self.cell_size
         grid_h = self.rows * self.cell_size
         self._offset_x = max(0, (self.width() - grid_w) // 2)
         self._offset_y = max(0, (self.height() - grid_h) // 2)
 
+    # Find cells whose value matches at least one of their 8 neighbors (conflict detection).
+    def _compute_conflicts(self) -> set[tuple[int, int]]:
+        conflicts: set[tuple[int, int]] = set()
+        for (r, c), value in self.values.items():
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    if dr == 0 and dc == 0:
+                        continue
+                    nr, nc = r + dr, c + dc
+                    if self.values.get((nr, nc)) == value:
+                        conflicts.add((r, c))
+        return conflicts
+
+    # Recalculate cell size and offset whenever the widget is resized.
     def resizeEvent(self, event):
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         super().resizeEvent(event)
         self.update()
 
+    # Update the grid data and trigger a full repaint with recalculated dimensions.
     def set_data(self, rows, cols, values, thick_borders, immutable_cells):
         self.rows: int = rows
         self.cols: int = cols
@@ -194,10 +212,18 @@ class GridView(QWidget):
         font: QFont = QFont("Arial", max(8, int(cs * 0.35)))
         painter.setFont(font)
 
+        # Highlight conflicting values in red, normal values in black.
+        conflicts = self._compute_conflicts()
+        red_pen = QPen(QColor(220, 30, 30))
+
         for (i, j), value in self.values.items():
             x: int = j * cs + ox
             y: int = i * cs + oy
             rect: QRect = QRect(x, y, cs, cs)
+            if (i, j) in conflicts:
+                painter.setPen(red_pen)
+            else:
+                painter.setPen(QPen(Qt.GlobalColor.black))
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(value))
 
         thick_pen: QPen = QPen(Qt.GlobalColor.black, max(2, int(cs * 0.08)))
@@ -339,6 +365,7 @@ class TestWindow(QMainWindow):
         popup: NumberSelector = NumberSelector(self, remaining_options, global_pos, cell_size)
         if popup.exec():
             new_number: int = popup.selected_number
+            # Re-selecting the same number clears the cell, otherwise replace it.
             if new_number == self.values.get((row, col)):
                 del self.values[(row, col)]
             else:
