@@ -42,6 +42,11 @@ class Cell:
     def __str__(self) -> str:
         return f"({self.x}, {self.y}) with value {self.value}"
 
+    def __eq__(self, other: object) -> bool:
+        if not hasattr(other, "value"):
+            return False
+        return self.value == other.value
+
     def to_list(self) -> list:
         return [self.x, self.y, self.value, self.immuable]
 
@@ -91,10 +96,11 @@ class Grid:
     """Represents the Neonaure game grid, including dimensions, cells, and patterns."""
 
     def __init__(self, patterns: list[Pattern]) -> None:
-        self.patterns = []
+        self.patterns: list[Pattern] = []
         for pattern in patterns:
             self._add_pattern(pattern)
-        self.height = self.width = None
+        self.height: int | None = None
+        self.width: int | None = None
         x, y = self.get_dimensions()
         self.matrix = [[None for _ in range(x)] for _ in range(y)]
         self._fill_matrix()
@@ -126,9 +132,20 @@ class Grid:
                         self.height = cell.y + 1
         return self.width, self.height
 
-    def neighbours(self, x: int, y: int) -> list:
-        """Returns a list of the closest neighbours of a grid."""
-        raise NotImplementedError
+    def neighbours(self, x: int, y: int) -> list[Cell]:
+        """Returns a list of the closest neighbours of a cell."""
+        offsets = [
+            (-1, 0), (1, 0), (0, -1), (0, 1), # 4 directions cardinales
+            (-1, -1), (-1, 1), (1, -1), (1, 1) # diagonales
+        ]
+        result = []
+        for dx, dy in offsets:
+            nx, ny = x + dx, y + dy
+            if (0 <= nx < self.width) and (0 <= ny < self.height):
+                cell = self.matrix[ny][nx]
+                if cell is not None:
+                    result.append(cell)
+        return result
 
     @classmethod
     def from_data(cls, data: dict) -> "Grid":
@@ -155,6 +172,21 @@ class Solver:
     def __init__(self, grid: Grid) -> None:
         self.grid = grid
 
+    def _has_conflict(self, cell: Cell) -> bool:
+        """Returns True if a cell shares its value with any of its neighbours."""
+        return any(
+            neighbour == cell
+            for neighbour in self.grid.neighbours(cell.x, cell.y)
+        )
+
+    def is_solved(self) -> bool:
+        """Returns True if all cells have a non-zero value and no cell shares its value with a neighbour."""
+        return all(
+            cell.value != 0 and not self._has_conflict(cell)
+            for pattern in self.grid.patterns
+            for cell in pattern.cells
+        )
+
 
 if __name__ == "__main__":
     data = load_json("./data/grids/default.json")
@@ -165,3 +197,7 @@ if __name__ == "__main__":
         for y in x:
             print(y.value, end="")
         print("")
+    print("")
+    for x in grid.neighbours(0, 5):
+        print(x.value, end="")
+    print("")
