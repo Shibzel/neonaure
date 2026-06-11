@@ -16,7 +16,7 @@ forwarded to the controller.
 from __future__ import annotations
 
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QSpinBox, QFormLayout
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent, QSize
 from typing import TYPE_CHECKING
@@ -202,7 +202,7 @@ class GridView(QWidget):
             local_y: int = y_rel % self.cell_size
             margin: int = 4
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
-                self.cell_clicked.emit(col, row)
+                self.cell_clicked.emit(row, col)
 
     def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
         painter: QPainter = QPainter(self)
@@ -256,6 +256,31 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
+class GridSizeDialog(QDialog):
+    """Popup pour choisir les dimensions X/Y de la nouvelle grille."""
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Nouvelle grille")
+        self.setFixedSize(220, 150)
+
+        layout: QFormLayout = QFormLayout(self)
+
+        self.spin_width: QSpinBox = QSpinBox()
+        self.spin_width.setRange(4, 12)
+        self.spin_width.setValue(8)
+        layout.addRow("Largeur :", self.spin_width)
+
+        self.spin_height: QSpinBox = QSpinBox()
+        self.spin_height.setRange(4, 12)
+        self.spin_height.setValue(8)
+        layout.addRow("Hauteur :", self.spin_height)
+
+        confirm_btn: QPushButton = QPushButton("Générer")
+        confirm_btn.clicked.connect(self.accept)
+        layout.addRow(confirm_btn)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, controller: Controller) -> None:
         super().__init__()
@@ -302,12 +327,31 @@ class MainWindow(QMainWindow):
         self.reset_button.clicked.connect(self.controller.reset_grid)
         btn_panel.addWidget(self.reset_button)
 
+        self.map_button: QPushButton = QPushButton()
+        self.map_button.setIcon(QIcon("assets/icons/map.png"))
+        self.map_button.setIconSize(QSize(40, 40))
+        self.map_button.setFixedSize(56, 56)
+        self.map_button.setToolTip("Nouvelle carte aléatoire")
+        self.map_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.map_button.setStyleSheet(btn_style)
+        self.map_button.clicked.connect(self._on_map_clicked)
+        btn_panel.addWidget(self.map_button)
+
         btn_panel.addStretch()
         main_layout.addLayout(btn_panel)
 
         self.setCentralWidget(central)
         self.grid_view.cell_clicked.connect(self.controller.handle_click)  # type: ignore[arg-type]
         self.resize(560, 500)
+
+    def _on_map_clicked(self) -> None:
+        """Ouvre le dialogue de taille puis demande au controller de générer."""
+        dialog: GridSizeDialog = GridSizeDialog(self)
+        if dialog.exec():
+            self.controller.generate_new_grid(
+                dialog.spin_width.value(),
+                dialog.spin_height.value(),
+            )
 
 
 test_data: dict[str, list[list[int]]] = {

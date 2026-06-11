@@ -744,3 +744,26 @@ Le Neonaure est un excellent projet pedagogique qui combine deux competences fon
 | Vue | `neonaure/view.py` | **75%** (grille responsive, popup, hover, conflits, boutons undo+reset) |
 | Controleur | `neonaure/controller.py` | **20%** (liaison modele-vue, clic, undo, reset) |
 | Package init | `neonaure/__init__.py` | **70%** |
+
+### 11/06/2026 - Session 7 : Generateur de grilles + bouton nouvelle carte
+
+#### Fonctionnalites ajoutees
+- **Generateur de grilles aleatoires** (`generate_grid.py`) : cree des grilles valides de taille configurable en decoupant la grille en regions connexes (random walk), en resolvant avec le Solver, puis en masquant des valeurs
+- **Bouton carte** (icone `map.png`) dans la barre laterale : ouvre un dialogue pour choisir la taille X/Y de la nouvelle grille, puis la genere et l'affiche
+- **Dialogue `GridSizeDialog`** : popup avec 2 QSpinBox (largeur/hauteur, de 3 a 12) et un bouton "Generer"
+
+#### Fichiers modifies
+- `generate_grid.py` (nouveau) : generateur de grilles avec `generate_regions()`, `solve_and_strip()`, `generate_grid()`, CLI via `argparse`
+- `neonaure/view.py` : ajout de `QSpinBox` et `QFormLayout` aux imports, nouvelle classe `GridSizeDialog`, bouton `map_button` dans `MainWindow`, methode `_on_map_clicked()`
+- `neonaure/controller.py` : nouvelle methode `generate_new_grid(width, height)` qui appelle `generate_grid()` et met a jour le modele + la vue
+
+#### Etat du projet apres cette session
+
+| Composant | Fichier | Avancement |
+|-----------|---------|-----------|
+| Modele | `neonaure/model.py` | **95%** |
+| Tests | `tests/test_model.py` | **100%** (44 tests verts) |
+| Vue | `neonaure/view.py` | **80%** (grille responsive, popup, hover, conflits, boutons undo+reset+map, dialogue taille) |
+| Controleur | `neonaure/controller.py` | **25%** (liaison modele-vue, clic, undo, reset, generation grille) |
+| Package init | `neonaure/__init__.py` | **70%** |
+| Generateur | `generate_grid.py` | **100%** (nouveau) |

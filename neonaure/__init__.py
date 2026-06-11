@@ -1,8 +1,8 @@
-"""
+﻿"""
 Neonaure
 
 Authors :
-    - Jean-François L. (contact@shibzel.me)
+    - Jean-Francois L. (contact@shibzel.me)
     - Adrien R.
     - Florian S.
 

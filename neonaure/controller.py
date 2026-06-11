@@ -117,3 +117,12 @@ class Controller:
                     cell.set_value(0)
         self._history.clear()
         self.update_view()
+
+    def generate_new_grid(self, width: int, height: int) -> None:
+        """Génère une nouvelle grille aléatoire et met à jour la vue."""
+        from generate_grid import generate_grid
+
+        data: dict[str, list[list[int]]] = generate_grid(width, height)
+        self.model = Grid.from_data(data)
+        self._history.clear()
+        self.update_view()
