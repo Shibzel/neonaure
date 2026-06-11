@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon, QPainterPath
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent, QSize
 from typing import TYPE_CHECKING
 
@@ -50,6 +50,14 @@ class NumberSelector(QDialog):
             if col > 2:
                 col = 0
                 row += 1
+
+        # Bouton croix pour fermer le popup
+        close_btn: QPushButton = QPushButton()
+        close_btn.setIcon(QIcon("assets/icons/cross.png"))
+        close_btn.setIconSize(QSize(btn_size - 8, btn_size - 8))
+        close_btn.setFixedSize(btn_size, btn_size)
+        close_btn.clicked.connect(self.reject)
+        layout.addWidget(close_btn, row, col)
 
         self.adjustSize()
 
@@ -248,82 +256,6 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
-def _create_trash_icon(size: int = 64) -> QIcon:
-    pixmap: QPixmap = QPixmap(size, size)
-    pixmap.fill(QColor(0, 0, 0, 0))
-    p: QPainter = QPainter(pixmap)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    s: int = size
-    pen: QPen = QPen(QColor(60, 60, 60), max(2, s // 20))
-    p.setPen(pen)
-    p.setBrush(QColor(180, 50, 50))
-
-    # couvercle
-    lid_top: int = int(s * 0.15)
-    lid_bot: int = int(s * 0.25)
-    lid_left: int = int(s * 0.2)
-    lid_right: int = int(s * 0.8)
-    p.drawRect(lid_left, lid_top, lid_right - lid_left, lid_bot - lid_top)
-    # poignée du couvercle
-    handle_w: int = int(s * 0.2)
-    p.drawRect(s // 2 - handle_w // 2, int(s * 0.05), handle_w, int(s * 0.12))
-
-    # corps de la poubelle
-    body_top: int = lid_bot
-    body_bot: int = int(s * 0.85)
-    body_left: int = int(s * 0.25)
-    body_right: int = int(s * 0.75)
-    p.drawRect(body_left, body_top, body_right - body_left, body_bot - body_top)
-
-    # lignes verticales sur le corps
-    p.setPen(QPen(QColor(60, 60, 60), max(1, s // 30)))
-    for frac in (0.38, 0.5, 0.62):
-        lx: int = int(s * frac)
-        p.drawLine(lx, body_top + int(s * 0.05), lx, body_bot - int(s * 0.05))
-
-    p.end()
-    return QIcon(pixmap)
-
-
-def _create_undo_icon(size: int = 64) -> QIcon:
-    import math
-    pixmap: QPixmap = QPixmap(size, size)
-    pixmap.fill(QColor(0, 0, 0, 0))
-    p: QPainter = QPainter(pixmap)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    s: int = size
-    pen: QPen = QPen(QColor(70, 130, 180), max(3, s // 14))
-    p.setPen(pen)
-    p.setBrush(Qt.BrushStyle.NoBrush)
-
-    cx: float = s * 0.5
-    cy: float = s * 0.55
-    radius: float = s * 0.28
-
-    start_angle: int = -30 * 16
-    span_angle: int = -300 * 16
-    p.drawArc(
-        int(cx - radius), int(cy - radius),
-        int(radius * 2), int(radius * 2),
-        start_angle, span_angle,
-    )
-
-    # pointe de fleche au debut de l'arc (angle -30 - 300 = -330 = 30 deg)
-    tip_angle: float = math.radians(30)
-    tx: float = cx + radius * math.cos(tip_angle)
-    ty: float = cy - radius * math.sin(tip_angle)
-
-    arrow_len: float = s * 0.16
-    for offset in (math.pi / 5, -math.pi / 5):
-        angle: float = tip_angle + math.pi + offset
-        ax: float = tx + arrow_len * math.cos(angle)
-        ay: float = ty - arrow_len * math.sin(angle)
-        p.drawLine(QPoint(int(tx), int(ty)), QPoint(int(ax), int(ay)))
-
-    p.end()
-    return QIcon(pixmap)
-
-
 class MainWindow(QMainWindow):
     def __init__(self, controller: Controller) -> None:
         super().__init__()
@@ -351,7 +283,7 @@ class MainWindow(QMainWindow):
         )
 
         self.undo_button: QPushButton = QPushButton()
-        self.undo_button.setIcon(_create_undo_icon(64))
+        self.undo_button.setIcon(QIcon("assets/icons/undo.png"))
         self.undo_button.setIconSize(QSize(40, 40))
         self.undo_button.setFixedSize(56, 56)
         self.undo_button.setToolTip("Annuler le dernier coup")
@@ -361,7 +293,7 @@ class MainWindow(QMainWindow):
         btn_panel.addWidget(self.undo_button)
 
         self.reset_button: QPushButton = QPushButton()
-        self.reset_button.setIcon(_create_trash_icon(64))
+        self.reset_button.setIcon(QIcon("assets/icons/trash.png"))
         self.reset_button.setIconSize(QSize(40, 40))
         self.reset_button.setFixedSize(56, 56)
         self.reset_button.setToolTip("Réinitialiser la grille")
@@ -458,7 +390,7 @@ class TestWindow(QMainWindow):
         )
 
         self.undo_button: QPushButton = QPushButton()
-        self.undo_button.setIcon(_create_undo_icon(64))
+        self.undo_button.setIcon(QIcon("assets/icons/undo.png"))
         self.undo_button.setIconSize(QSize(40, 40))
         self.undo_button.setFixedSize(56, 56)
         self.undo_button.setToolTip("Annuler le dernier coup")
@@ -468,7 +400,7 @@ class TestWindow(QMainWindow):
         btn_panel.addWidget(self.undo_button)
 
         self.reset_button: QPushButton = QPushButton()
-        self.reset_button.setIcon(_create_trash_icon(64))
+        self.reset_button.setIcon(QIcon("assets/icons/trash.png"))
         self.reset_button.setIconSize(QSize(40, 40))
         self.reset_button.setFixedSize(56, 56)
         self.reset_button.setToolTip("Réinitialiser la grille")
