@@ -1,359 +1,233 @@
 """
-Neonaure - Startup Screen Module
+Neonaure - Startup Module
 
-This module provides the startup screen with a dynamic carousel, 
-grid preview rendering, and saved game loading functionality.
+Gère l'écran de démarrage du jeu, la sélection des grilles, 
+la prévisualisation et le suivi de la progression.
 """
-
-from __future__ import annotations
 
 import os
 import json
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
-    QScrollArea, QFileDialog, QSizePolicy, QGraphicsDropShadowEffect
-)
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QPixmap, QBrush, QCursor
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QSize, QPropertyAnimation, QRect
+from glob import glob
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QGridLayout, 
+                             QScrollArea, QFrame, QGraphicsOpacityEffect)
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QFont
 
-"""Import the model to read grid data for preview rendering"""
 from .model import Grid
+from .view import GridView
 
-"""Dynamic determination of the grids directory path"""
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GRIDS_DIR = os.path.join(BASE_DIR, "data", "grids")
+try:
+    from generate_grid import generate_grid
+except ImportError:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from generate_grid import generate_grid
 
-# Palette de couleurs pour les motifs dans l'aperçu
-PATTERN_COLORS = [
-    QColor(0, 255, 204, 60),   
-    QColor(255, 0, 204, 60),   
-    QColor(255, 204, 0, 60),   
-    QColor(0, 102, 255, 60),   
-    QColor(102, 255, 0, 60),   
-    QColor(255, 51, 51, 60),   
-    QColor(153, 51, 255, 60),  
-    QColor(255, 153, 51, 60),  
-]
+PROGRESS_FILE = "./data/progress.json"
+GRIDS_DIR = "./data/grids"
 
 
-# Carte cliquable représentant une grille dans le carousel
-class GridCard(QPushButton):
-    """Custom button representing a grid card in the carousel."""
+def load_progress() -> list[str]:
+    """Charge la liste des grilles débloquées depuis le fichier de sauvegarde."""
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE, "r") as f:
+            return json.load(f).get("unlocked", ["default.json"])
+    return ["default.json"]
 
-    # Signal personnalisé émis au clic, contient le chemin du fichier
-    clicked_with_path = pyqtSignal(str)
 
-    # Construction de la carte (preview + nom + style néon)
-    def __init__(self, file_path: str, parent=None):
+def save_progress(unlocked: list[str]) -> None:
+    """Sauvegarde la liste des grilles débloquées dans le fichier de progression."""
+    os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
+    with open(PROGRESS_FILE, "w") as f:
+        json.dump({"unlocked": unlocked}, f)
+
+
+def unlock_next_grid(current_file_path: str) -> None:
+    """Débloque la grille suivante dans l'ordre alphabétique."""
+    unlocked = load_progress()
+    current_name = os.path.basename(current_file_path)
+    
+    files = [os.path.basename(f) for f in glob(os.path.join(GRIDS_DIR, "*.json"))]
+    files.sort()
+    
+    if "default.json" in files:
+        files.remove("default.json")
+        files.insert(0, "default.json")
+        
+    try:
+        idx = files.index(current_name)
+        if idx + 1 < len(files):
+            next_grid = files[idx + 1]
+            if next_grid not in unlocked:
+                unlocked.append(next_grid)
+                save_progress(unlocked)
+    except ValueError:
+        pass
+
+
+class LevelCard(QFrame):
+    """Carte cliquable affichant une prévisualisation de grille de niveau."""
+    clicked = pyqtSignal(str)
+
+    def __init__(self, file_path: str, is_unlocked: bool, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        self.grid_name = os.path.splitext(os.path.basename(file_path))[0].replace("_", " ").title()
-        
-        self.setFixedSize(200, 250)
-        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        
-        """Card layout setup"""
+        self.is_unlocked = is_unlocked
+        self.setFixedSize(160, 180)
+        self.setStyleSheet("QFrame { border: 1px solid #ccc; border-radius: 8px; background-color: #fff; }")
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        
+        self.preview = GridView(self)
+        self._setup_preview()
+        layout.addWidget(self.preview, stretch=1)
+        
+        name = os.path.basename(file_path).replace(".json", "")
+        lbl = QLabel(name)
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setStyleSheet("border: none; font-weight: bold; color: black;")
+        layout.addWidget(lbl)
 
-        """Label for the preview image"""
-        self.preview_label = QLabel()
-        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setFixedSize(180, 180)
-        layout.addWidget(self.preview_label)
-
-        """Label for the grid name"""
-        self.name_label = QLabel(self.grid_name)
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.name_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-        self.name_label.setStyleSheet("color: #E0E0E0; border: none;")
-        layout.addWidget(self.name_label)
-
-        """Trigger the preview rendering"""
-        self._render_preview()
-
-        """Base style and effects"""
-        self.setStyleSheet("""
-            GridCard {
-                background-color: #2B2B2B;
-                border: 2px solid #444;
-                border-radius: 15px;
-            }
-            GridCard:hover {
-                background-color: #3A3A3A;
-                border: 2px solid #00FFCC;
-            }
-        """)
-
-        """Glow effect on hover"""
-        self.shadow = QGraphicsDropShadowEffect(self)
-        self.shadow.setBlurRadius(20)
-        self.shadow.setColor(QColor(0, 255, 204, 0)) 
-        self.shadow.setOffset(0, 0)
-        self.setGraphicsEffect(self.shadow)
-
-        self.clicked.connect(lambda: self.clicked_with_path.emit(self.file_path))
-
-    # Dessine un aperçu miniature de la grille
-    def _render_preview(self):
-        """Generates a QPixmap of the grid for the preview."""
-        try:
-            grid = Grid.from_json(self.file_path)
-            width, height = grid.get_dimensions()
-            if width == 0 or height == 0:
-                return
-
-            pixmap = QPixmap(180, 180)
-            pixmap.fill(Qt.GlobalColor.transparent)
+        if not is_unlocked:
+            effect = QGraphicsOpacityEffect(self)
+            effect.setOpacity(0.2)
+            self.setGraphicsEffect(effect)
             
-            p = QPainter(pixmap)
-            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    def _setup_preview(self) -> None:
+        """Charge la grille et prépare les données pour l'affichage miniature."""
+        grid = Grid.from_json(self.file_path)
+        values = {}
+        thick_borders = []
+        immutable_cells = set()
+        pattern_membership = {}
+        
+        rows, cols = grid.get_dimensions()
+        for pattern in grid.patterns:
+            for cell in pattern.cells:
+                pattern_membership[(cell.y, cell.x)] = pattern.name
+                if cell.value > 0:
+                    values[(cell.y, cell.x)] = cell.value
+                    immutable_cells.add((cell.y, cell.x))
 
-            margin = 10
-            available_size = 180 - 2 * margin
-            cell_size = min(available_size / width, available_size / height)
-            
-            ox = (180 - width * cell_size) / 2
-            oy = (180 - height * cell_size) / 2
+        for r in range(rows):
+            for c in range(cols):
+                cur_pat = pattern_membership.get((r, c))
+                if r == 0 or pattern_membership.get((r-1, c)) != cur_pat:
+                    thick_borders.append((c, r, c+1, r))
+                if r == rows - 1 or pattern_membership.get((r+1, c)) != cur_pat:
+                    thick_borders.append((c, r+1, c+1, r+1))
+                if c == 0 or pattern_membership.get((r, c-1)) != cur_pat:
+                    thick_borders.append((c, r, c, r+1))
+                if c == cols - 1 or pattern_membership.get((r, c+1)) != cur_pat:
+                    thick_borders.append((c+1, r, c+1, r+1))
 
-            """Assign colors to patterns"""
-            pattern_colors = {}
-            for i, pattern in enumerate(grid.patterns):
-                pattern_colors[pattern.name] = PATTERN_COLORS[i % len(PATTERN_COLORS)]
+        self.preview.set_data(rows, cols, values, thick_borders, immutable_cells, pattern_membership)
+        self.preview.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
-            """Draw filled cells"""
-            for pattern in grid.patterns:
-                color = pattern_colors[pattern.name]
-                p.setBrush(QBrush(color))
-                p.setPen(Qt.PenStyle.NoPen)
-                for cell in pattern.cells:
-                    x = int(ox + cell.x * cell_size)
-                    y = int(oy + cell.y * cell_size)
-                    cs = int(cell_size)
-                    p.drawRect(QRect(x, y, cs, cs))
-
-            """Draw thick borders (similar logic to the controller)"""
-            thick_pen = QPen(QColor("#E0E0E0"), max(2, int(cell_size * 0.1)))
-            p.setPen(thick_pen)
-
-            for r in range(height):
-                for c in range(width):
-                    current_pattern_name = None
-                    cell = grid.get_cell(c, r)
-                    if cell:
-                        pat = grid.get_pattern_of(c, r)
-                        if pat: 
-                            current_pattern_name = pat.name
-
-                    """Top border"""
-                    if r == 0 or grid.get_pattern_of(c, r-1) is None or grid.get_pattern_of(c, r-1).name != current_pattern_name:
-                        p.drawLine(QPoint(int(ox + c*cell_size), int(oy + r*cell_size)), QPoint(int(ox + (c+1)*cell_size), int(oy + r*cell_size)))
-                    
-                    """Bottom border"""
-                    if r == height - 1 or grid.get_pattern_of(c, r+1) is None or grid.get_pattern_of(c, r+1).name != current_pattern_name:
-                        p.drawLine(QPoint(int(ox + c*cell_size), int(oy + (r+1)*cell_size)), QPoint(int(ox + (c+1)*cell_size), int(oy + (r+1)*cell_size)))
-                    
-                    """Left border"""
-                    if c == 0 or grid.get_pattern_of(c-1, r) is None or grid.get_pattern_of(c-1, r).name != current_pattern_name:
-                        p.drawLine(QPoint(int(ox + c*cell_size), int(oy + r*cell_size)), QPoint(int(ox + c*cell_size), int(oy + (r+1)*cell_size)))
-                    
-                    """Right border"""
-                    if c == width - 1 or grid.get_pattern_of(c+1, r) is None or grid.get_pattern_of(c+1, r).name != current_pattern_name:
-                        p.drawLine(QPoint(int(ox + (c+1)*cell_size), int(oy + r*cell_size)), QPoint(int(ox + (c+1)*cell_size), int(oy + (r+1)*cell_size)))
-
-            """Draw pre-filled values"""
-            font = QFont("Arial", max(6, int(cell_size * 0.4)))
-            p.setFont(font)
-            p.setPen(QColor("#FFFFFF"))
-            for pattern in grid.patterns:
-                for cell in pattern.cells:
-                    if cell.value != 0:
-                        x = int(ox + cell.x * cell_size)
-                        y = int(oy + cell.y * cell_size)
-                        cs = int(cell_size)
-                        p.drawText(QRect(x, y, cs, cs), Qt.AlignmentFlag.AlignCenter, str(cell.value))
-            
-            p.end()
-            self.preview_label.setPixmap(pixmap)
-
-        except Exception as e:
-            print(f"Error while rendering {self.file_path}: {e}")
-
-    # Animation de glow néon au survol
-    def enterEvent(self, event):
-        """Neon glow animation on hover enter"""
-        self.anim = QPropertyAnimation(self.shadow, b"color")
-        self.anim.setDuration(200)
-        self.anim.setStartValue(QColor(0, 255, 204, 0))
-        self.anim.setEndValue(QColor(0, 255, 204, 150))
-        self.anim.start()
-        super().enterEvent(event)
-
-    # Animation de glow néon quand on sort du survol
-    def leaveEvent(self, event):
-        """Neon glow animation on hover leave"""
-        self.anim = QPropertyAnimation(self.shadow, b"color")
-        self.anim.setDuration(200)
-        self.anim.setStartValue(QColor(0, 255, 204, 150))
-        self.anim.setEndValue(QColor(0, 255, 204, 0))
-        self.anim.start()
-        super().leaveEvent(event)
+    def mousePressEvent(self, event) -> None:
+        """Emet le signal de clic uniquement si le niveau est débloqué."""
+        if self.is_unlocked:
+            self.clicked.emit(self.file_path)
 
 
-# Écran d'accueil avec carousel de grilles
-class StartupWindow(QMainWindow):
-    """Startup window containing the grid selection carousel."""
-    
-    # Signal émis quand une grille est sélectionnée
-    start_game_signal = pyqtSignal(str) 
+class GenerateCard(QFrame):
+    """Carte spéciale générant une nouvelle grille 8x8 au clic."""
+    clicked = pyqtSignal()
 
-    # Construction de l'écran (titre, carousel, bouton load)
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(160, 180)
+        self.setStyleSheet("QFrame { border: 2px dashed #888; border-radius: 8px; background-color: #f9f9f9; }")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        layout = QVBoxLayout(self)
+        lbl = QLabel("+ Générer 8x8")
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl.setStyleSheet("border: none; font-size: 16px; font-weight: bold; color: black;")
+        layout.addWidget(lbl)
+
+    def mousePressEvent(self, event) -> None:
+        """Déclenche l'événement de génération."""
+        self.clicked.emit()
+
+
+class StartupWindow(QWidget):
+    """Fenêtre principale de démarrage affichant le menu des niveaux."""
+    start_game_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Neonaure - Startup")
-        self.setFixedSize(900, 600)
-        self.setStyleSheet("background-color: #1E1E1E; color: white;")
-
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(30)
-
-        """Title"""
+        self.setWindowTitle("Neonaure - Niveaux")
+        self.resize(850, 600)
+        self.setStyleSheet("QWidget { background-color: white; color: black; }")
+        
+        main_layout = QVBoxLayout(self)
+        
         title = QLabel("NEONAURE")
-        title.setFont(QFont("Arial", 48, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #00FFCC; border: none;")
+        title.setFont(QFont("Arial", 40, QFont.Weight.Bold))
+        title.setContentsMargins(0, 20, 0, 30)
         main_layout.addWidget(title)
-
-        subtitle = QLabel("Select a grid to start")
-        subtitle.setFont(QFont("Arial", 14))
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setStyleSheet("color: #AAAAAA; border: none; margin-bottom: 10px;")
-        main_layout.addWidget(subtitle)
-
-        """Carousel Area"""
-        carousel_container = QWidget()
-        carousel_layout = QHBoxLayout(carousel_container)
-        carousel_layout.setContentsMargins(0, 0, 0, 0)
-        carousel_layout.setSpacing(10)
-
-        """Left arrow"""
-        left_arrow = QPushButton("◀")
-        left_arrow.setFixedSize(40, 40)
-        left_arrow.setStyleSheet(self._arrow_style())
-        left_arrow.clicked.connect(lambda: self._scroll_carousel(-300))
-
-        """Scrollable area"""
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         
-        self.carousel_content = QWidget()
-        self.carousel_layout = QHBoxLayout(self.carousel_content)
-        self.carousel_layout.setSpacing(20)
-        self.carousel_layout.setContentsMargins(20, 0, 20, 0)
-        self.carousel_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        self.scroll_area.setWidget(self.carousel_content)
-
-        """Right arrow"""
-        right_arrow = QPushButton("▶")
-        right_arrow.setFixedSize(40, 40)
-        right_arrow.setStyleSheet(self._arrow_style())
-        right_arrow.clicked.connect(lambda: self._scroll_carousel(300))
-
-        carousel_layout.addWidget(left_arrow)
-        carousel_layout.addWidget(self.scroll_area, stretch=1)
-        carousel_layout.addWidget(right_arrow)
-
-        main_layout.addWidget(carousel_container, stretch=1)
-
-        """Load saved game button"""
-        self.load_btn = QPushButton("📂 Load a saved game")
-        self.load_btn.setFixedHeight(50)
-        self.load_btn.setFont(QFont("Arial", 12))
-        self.load_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.load_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #333333;
-                color: #FFFFFF;
-                border: 2px solid #555555;
-                border-radius: 10px;
-            }
-            QPushButton:hover {
-                background-color: #444444;
-                border: 2px solid #FF00CC;
-                color: #FF00CC;
-            }
-        """)
-        self.load_btn.clicked.connect(self._load_saved_game)
-        main_layout.addWidget(self.load_btn, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        """Dynamically load grids"""
-        self._populate_carousel()
-
-    # Style CSS des flèches du carousel
-    def _arrow_style(self):
-        """Returns the stylesheet for the carousel arrows."""
-        return """
-            QPushButton {
-                background-color: #333333;
-                color: white;
-                border: none;
-                border-radius: 20px;
-                font-size: 18px;
-            }
-            QPushButton:hover {
-                background-color: #00FFCC;
-                color: #1E1E1E;
-            }
-        """
-
-    # Scanne le dossier des grilles et crée les cartes
-    def _populate_carousel(self):
-        """Scans the data/grids folder and generates the cards."""
-        if not os.path.exists(GRIDS_DIR):
-            os.makedirs(GRIDS_DIR)
-            return
-
-        grid_files = [f for f in os.listdir(GRIDS_DIR) if f.endswith('.json')]
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; }")
         
-        """Sort to ensure consistent display order"""
-        grid_files.sort()
+        container = QWidget()
+        self.grid_layout = QGridLayout(container)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        scroll.setWidget(container)
+        main_layout.addWidget(scroll)
+        
+        self._load_levels()
 
-        for grid_file in grid_files:
-            file_path = os.path.join(GRIDS_DIR, grid_file)
-            card = GridCard(file_path)
-            card.clicked_with_path.connect(self._on_grid_selected)
-            self.carousel_layout.addWidget(card)
+    def _load_levels(self) -> None:
+        """Instancie et place toutes les cartes de niveaux dans la grille."""
+        unlocked = load_progress()
+        
+        gen_card = GenerateCard()
+        gen_card.clicked.connect(self._generate_and_play)
+        self.grid_layout.addWidget(gen_card, 0, 0)
+        
+        files = glob(os.path.join(GRIDS_DIR, "*.json"))
+        files.sort()
+        
+        default_path = os.path.join(GRIDS_DIR, "default.json")
+        if default_path in files:
+            files.remove(default_path)
+            files.insert(0, default_path)
+            
+        col, row = 1, 0
+        for file_path in files:
+            filename = os.path.basename(file_path)
+            is_unlocked = filename in unlocked
+            
+            card = LevelCard(file_path, is_unlocked)
+            card.clicked.connect(self.start_game_signal.emit)
+            if is_unlocked:
+                card.setCursor(Qt.CursorShape.PointingHandCursor)
+                
+            self.grid_layout.addWidget(card, row, col)
+            col += 1
+            if col > 4:
+                col = 0
+                row += 1
 
-    # Fait défiler le carousel de manière fluide
-    def _scroll_carousel(self, delta_x: int):
-        """Scrolls the carousel smoothly."""
-        scroll_bar = self.scroll_area.horizontalScrollBar()
-        anim = QPropertyAnimation(scroll_bar, b"value")
-        anim.setDuration(300)
-        anim.setStartValue(scroll_bar.value())
-        anim.setEndValue(scroll_bar.value() + delta_x)
-        anim.start()
-
-    # Callback quand une grille est choisie
-    def _on_grid_selected(self, file_path: str):
-        """Called when the user clicks on a grid card."""
-        self.start_game_signal.emit(file_path)
-        self.close()
-
-    # Ouvre un dialogue de fichier pour charger une sauvegarde
-    def _load_saved_game(self):
-        """Opens a file dialog to load a saved game file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load save", "", "JSON Files (*.json)"
-        )
-        if file_path:
-            self.start_game_signal.emit(file_path)
-            self.close()
+    def _generate_and_play(self) -> None:
+        """Génère une carte, la sauvegarde de manière incrémentale et la lance."""
+        data = generate_grid(8, 8)
+        os.makedirs(GRIDS_DIR, exist_ok=True)
+        
+        i = 1
+        while os.path.exists(os.path.join(GRIDS_DIR, f"grid_gen_{i}.json")):
+            i += 1
+            
+        new_path = os.path.join(GRIDS_DIR, f"grid_gen_{i}.json")
+        with open(new_path, "w") as f:
+            json.dump(data, f, indent=2)
+            
+        unlocked = load_progress()
+        unlocked.append(f"grid_gen_{i}.json")
+        save_progress(unlocked)
+        
+        self.start_game_signal.emit(new_path)
