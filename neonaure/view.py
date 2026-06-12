@@ -10,15 +10,14 @@ This module handles the graphical user interface (GUI) components, including:
 The view observes the model and updates the display accordingly but does NOT
 contain any game logic or data manipulation. All user interactions are
 forwarded to the controller.
-- TODO
 """
 
 from __future__ import annotations
 
 import os
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QSpinBox, QFormLayout
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSpinBox, QFormLayout
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QIcon
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent, QSize
 from typing import TYPE_CHECKING
 
@@ -119,9 +118,10 @@ class GridView(QWidget):
             return 50
         available_w: int = self.width() - 20
         available_h: int = self.height() - 20
-        cell_w: int = available_w // self.cols
-        cell_h: int = available_h // self.rows
-        return max(20, min(cell_w, cell_h))
+        cell_w: int = available_w // self.cols if self.cols > 0 else 50
+        cell_h: int = available_h // self.rows if self.rows > 0 else 50
+        # Réduction de la limite minimale à 5 pour s'adapter aux grilles très rectangulaires
+        return max(5, min(cell_w, cell_h))
 
     # Centre la grille dans le widget
     def _compute_offset(self) -> None:
@@ -131,34 +131,26 @@ class GridView(QWidget):
         self.offset_y = max(0, (self.height() - grid_h) // 2)
 
     # Detecte les conflits : valeurs identiques entre voisins ou dans un meme motif
-    # Retourne un ensemble de tuples (ligne, colonne) des cellules en conflit
     def _compute_conflicts(self) -> set[tuple[int, int]]:
         conflicts = set()
 
-        # 1er check : conflit de voisinage
-        # Pour chaque cellule qui a une valeur, on regarde si un voisin a la meme
         for (r, c), value in self.values.items():
-            # On teste les 8 directions autour de la cellule
             for dr in (-1, 0, 1):
                 for dc in (-1, 0, 1):
                     if dr == 0 and dc == 0:
                         continue
                     nr = r + dr
                     nc = c + dc
-                    # Si le voisin existe et a la meme valeur, c'est un conflit
                     if self.values.get((nr, nc)) == value:
                         conflicts.add((r, c))
 
-        # 2eme check : conflit de motif (doublon dans un meme motif)
         if self.pattern_membership:
-            # On regroupe les cellules par motif
             pattern_cells = {}
             for pos, pname in self.pattern_membership.items():
                 if pname not in pattern_cells:
                     pattern_cells[pname] = []
                 pattern_cells[pname].append(pos)
 
-            # Pour chaque motif, on compare chaque paire de cellules
             for cells in pattern_cells.values():
                 for i in range(len(cells)):
                     r1, c1 = cells[i]
@@ -196,7 +188,8 @@ class GridView(QWidget):
         self.thick_borders = thick_borders
         self.immutable_cells = immutable_cells
         self.pattern_membership = pattern_membership or {}
-        self.setMinimumSize(self.cols * 20 + 20, self.rows * 20 + 20)
+        # Réduction de la marge pour ne pas faire exploser la fenêtre sur des formats spéciaux
+        self.setMinimumSize(self.cols * 5 + 20, self.rows * 5 + 20)
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         self.update()
@@ -411,7 +404,6 @@ test_data: dict[str, list[list[int]]] = {
     "motif15": [[5,5,0]],
 }
 
-
 # Transforme les donnees brutes en structures utilisables par GridView
 def prepare_test_data(
     data: dict[str, list[list[int]]],
@@ -514,24 +506,19 @@ class TestWindow(QMainWindow):
 
     # Gere le clic sur une cellule en mode test
     def handle_test_click(self, col: int, row: int) -> None:
-        # Si la cellule est immuable (pre-remplie), on ne fait rien
         if (row, col) in self.immutable_cells:
             return
 
-        # On cherche a quel motif appartient cette cellule
         current_pattern = self.pattern_membership.get((row, col))
         if not current_pattern:
             return
 
-        # On recupere toutes les cellules du meme motif
         pattern_cells = []
         for (r, c), p in self.pattern_membership.items():
             if p == current_pattern:
                 pattern_cells.append((r, c))
         pattern_size = len(pattern_cells)
 
-        # On calcule les numeros encore disponibles
-        # (tous les numeros de 1 a la taille du motif, moins ceux deja utilises)
         possible_numbers = set(range(1, pattern_size + 1))
         for r, c in pattern_cells:
             if (r, c) in self.immutable_cells and (r, c) != (row, col):
@@ -583,7 +570,6 @@ class TestWindow(QMainWindow):
 
     # Reinitialise la grille en supprimant les valeurs non immuables
     def reset_grid(self) -> None:
-        # On recupere les cles a supprimer (cellules non immuables)
         keys_to_remove = []
         for pos in self.values:
             if pos not in self.immutable_cells:
