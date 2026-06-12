@@ -16,9 +16,11 @@ from pathlib import Path
 
 from neonaure.model import Grid, Solver
 
+# Ratio d'indices laissés visibles
 DEFAULT_CLUE_RATIO: float = 0.35
 
 
+# Découpe la grille en régions connexes compactes
 def generate_regions(width: int, height: int) -> dict[str, list[list[int]]]:
     """
     Découpe une grille en régions connexes compactes de taille ~5.
@@ -60,13 +62,19 @@ def generate_regions(width: int, height: int) -> dict[str, list[list[int]]]:
 
     random.shuffle(regions)
 
-    data: dict[str, list[list[int]]] = {}
-    for i, cells in enumerate(regions):
-        data[f"motif{i + 1}"] = [[x, y, 0] for x, y in cells]
+    # On construit le dictionnaire final avec les noms de motifs
+    data = {}
+    for i in range(len(regions)):
+        cells = regions[i]
+        cell_data = []
+        for x, y in cells:
+            cell_data.append([x, y, 0])
+        data["motif" + str(i + 1)] = cell_data
 
     return data
 
 
+# Résout la grille puis masque une partie des valeurs
 def solve_and_strip(
     data: dict[str, list[list[int]]],
     clue_ratio: float = DEFAULT_CLUE_RATIO,
@@ -83,25 +91,37 @@ def solve_and_strip(
     if not solver.solve():
         raise RuntimeError("Grille insoluble")
 
-    all_cells: list[tuple[str, int, int, int]] = []
+    # On rassemble toutes les cellules avec leur motif, coordonnees et valeur
+    all_cells = []
     for pattern in grid.patterns:
         for cell in pattern.cells:
             all_cells.append((pattern.name, cell.x, cell.y, cell.value))
 
+    # On melange pour choisir les indices au hasard
     random.shuffle(all_cells)
-    n_clues: int = max(1, int(len(all_cells) * clue_ratio))
-    clues_set: set[tuple[int, int]] = {(x, y) for _, x, y, _ in all_cells[:n_clues]}
+    n_clues = max(1, int(len(all_cells) * clue_ratio))
 
-    result: dict[str, list[list[int]]] = {}
+    # On garde les coordonnees des indices (cellules qui resteront visibles)
+    clues_set = set()
+    for i in range(n_clues):
+        _, x, y, _ = all_cells[i]
+        clues_set.add((x, y))
+
+    # On construit le resultat : les indices gardent leur valeur, le reste passe a 0
+    result = {}
     for pattern in grid.patterns:
-        result[pattern.name] = [
-            [cell.x, cell.y, cell.value if (cell.x, cell.y) in clues_set else 0]
-            for cell in pattern.cells
-        ]
+        cell_list = []
+        for cell in pattern.cells:
+            if (cell.x, cell.y) in clues_set:
+                cell_list.append([cell.x, cell.y, cell.value])
+            else:
+                cell_list.append([cell.x, cell.y, 0])
+        result[pattern.name] = cell_list
 
     return result
 
 
+# Pipeline complet : découpe -> résout -> masque
 def generate_grid(
     width: int = 8,
     height: int = 8,
@@ -112,6 +132,7 @@ def generate_grid(
     return solve_and_strip(data, clue_ratio)
 
 
+# Point d'entrée CLI
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Générateur de grilles Neonaure"
@@ -129,8 +150,14 @@ def main() -> None:
     print(f"Génération d'une grille {w}×{h}...")
     result: dict[str, list[list[int]]] = generate_grid(w, h, args.clues)
 
-    total: int = sum(len(v) for v in result.values())
-    clues: int = sum(1 for cells in result.values() for c in cells if c[2] != 0)
+    # On compte le nombre total de cellules et d'indices
+    total = 0
+    clues = 0
+    for cells in result.values():
+        total += len(cells)
+        for c in cells:
+            if c[2] != 0:
+                clues += 1
     print(f"Cellules: {total}, Indices: {clues}")
 
     output_dir: Path = Path("data/grids")

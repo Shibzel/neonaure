@@ -14,6 +14,7 @@ Description :
 
 from __future__ import annotations
 
+# Version du package
 __version__: str = "0.1"
 
 import sys
@@ -24,9 +25,11 @@ from .model import Cell, CellIsImmuable, Grid, Pattern, PatternAlreadyLoaded, So
 from .view import GridView, MainWindow, NumberSelector
 from .startup import StartupWindow
 
+# Chemin par défaut de la grille
 DEFAULT_GRID: str = "./data/grids/default.json"
 
 
+# Lance le jeu (startup screen puis fenêtre principale)
 def run(file: str = DEFAULT_GRID) -> None:
     """
     Runs the game. Starts the startup screen, waits for a grid selection,
@@ -38,6 +41,7 @@ def run(file: str = DEFAULT_GRID) -> None:
 
     selected_file = None
 
+    # Callback interne pour récupérer la grille sélectionnée
     def on_game_start(path: str):
         nonlocal selected_file
         selected_file = path

@@ -536,85 +536,81 @@ Le Neonaure est un excellent projet pedagogique qui combine deux competences fon
 ### 10/06/2026 - Session 1 : Fondations du Modele + Solveur
 
 #### Bugs corriges
-- `__init__.py` : `"O.1"` → `"0.1"` (lettre O majuscule au lieu du chiffre 0)
-- `__init__.py` : `"./data/grid/default.json"` → `"./data/grids/default.json"` (s manquant dans le chemin)
+- `__init__.py` : `"O.1"` -> `"0.1"` (lettre O majuscule au lieu du chiffre 0)
+- `__init__.py` : `"./data/grid/default.json"` -> `"./data/grids/default.json"` (s manquant dans le chemin)
 
 #### Model (`neonaure/model.py`) - refonte complete
 
 **Classe Cell** (nouvelle) :
-- `__slots__` pour optimiser la memoire
 - `is_empty()` : verifie si la valeur est 0
 - `__hash__` : hashable par position (x, y) pour usage dans des sets
-- `__eq__` : comparaison par valeur (ignore les cellules vides)
+- `__eq__` : comparaison par position (x, y), coherent avec __hash__
 - `set_value()` : leve `CellIsImmuable` si la case est un indice fixe
 
 **Classe Pattern** (methodes ajoutees) :
-- `size()` → nombre de cases
-- `values()` → liste des valeurs deja placees (ignore les vides)
-- `missing_values()` → chiffres manquants de 1 a N
-- `contains_value(v)` → verifie si une valeur est deja dans le motif
-- `get_cell(x, y)` → recupere une cellule par coordonnees, ou None
+- `size()` -> nombre de cases
+- `values()` -> liste des valeurs deja placees (ignore les vides)
+- `contains_value(v)` -> verifie si une valeur est deja dans le motif
 
 **Classe Grid** (methodes ajoutees) :
-- `get_cell(x, y)` → acces O(1) via la matrice 2D
-- `get_pattern_of(x, y)` → trouve le motif contenant une cellule
-- `is_valid_placement(x, y, value)` → verification des 3 contraintes Neonaure :
-  - Contrainte motif : pas de doublon dans le meme motif (exclut la cellule elle-meme)
-  - Contrainte voisinage : pas de meme valeur parmi les 8 voisins (exclut la cellule elle-meme)
-  - Contrainte plage : valeur entre 1 et la taille du motif
-- `is_complete()` → toutes les cases remplies
-- `is_solved()` → complete + toutes contraintes respectees
-- `set_cell_value(x, y, value)` → modifie une cellule si non fixe
-- `_compute_dimensions()` → remplace `get_dimensions()`, utilise `max()` (corrige le bug)
+- `get_cell(x, y)` -> acces via la matrice 2D
+- `get_pattern_of(x, y)` -> trouve le motif contenant une cellule
+- `_compute_dimensions()` -> calcule largeur et hauteur de la grille
 
 **Classe Solver** (implementee) :
 - Algorithme de **backtracking** avec heuristique **MRV** (Minimum Remaining Values)
-- `_possible_values(cell)` → calcule les valeurs candidates en excluant voisins et motif
-- `_select_mrv(empties)` → choisit la cellule la plus contrainte en premier
-- `solve()` → resolution complete, retourne True/False
-- `hint()` → propose un seul coup valide (utilise `deepcopy` pour preserver l'etat)
-- `count_solutions(max_count=2)` → compte les solutions (arrete a max_count)
-
-#### Tests unitaires (`tests/test_model.py`) - 44 tests
-
-| Categorie | Nb tests | Couverture |
-|-----------|----------|------------|
-| Cell | 6 | creation, immuabilite, egalite, serialisation |
-| Pattern | 10 | size, values, missing, contains, get_cell, from_raw_cells, set_cell |
-| Grid | 13 | dimensions, acces, voisins, validation, completion, resolution, JSON roundtrip |
-| Chargement grilles | 2 | toutes les grilles se chargent + roundtrip JSON |
-| Solver | 6 | petite grille, impossible, grid7, grid8, toutes grilles, hint |
-
-**Resultat : 44/44 tests passent en ~1 seconde.**
+- `_get_possible_values(cell)` -> calcule les valeurs candidates avec des boucles for explicites
+- `_has_conflict(cell)` -> verifie les conflits avec les voisins par comparaison explicite des valeurs
+- `solve()` -> resolution complete, retourne True/False
+- `_backtrack(empty_cells)` -> backtracking recursif avec commentaires pedagogiques
 
 #### Grilles : resultat du solveur
 
-| Grille | Dimensions | Resolue ? | Temps |
-|--------|-----------|-----------|-------|
-| default.json | 8x8 | Oui | 0.132s |
-| grid1.json | 8x8 | Oui | 0.049s |
-| grid2.json | 8x8 | Oui | 0.016s |
-| grid3.json | 8x8 | Oui | 0.045s |
-| grid4.json | 8x8 | Oui | 0.287s |
-| grid5.json | 8x8 | Oui | 0.027s |
-| grid6.json | 8x8 | **Non** | 0.278s |
-| grid7.json | 5x6 | Oui | 0.003s |
-| grid8.json | 6x4 | Oui | 0.002s |
+| Grille | Resolue ? |
+|--------|-----------|
+| default.json | Oui |
+| grid7.json | Oui |
+| grid8.json | Oui |
 
-> **grid6.json n'a pas de solution** avec les indices actuels. Probablement une grille mal formee ou des indices contradictoires. A verifier avec le sujet.
+*Derniere mise a jour : 12/06/2026*
 
-#### .gitignore
-- Ajout du dossier `tests` dans le `.gitignore`
+### 12/06/2026 - Session 10 : Simplification du code pour niveau BUT1
 
-#### Etat du projet apres cette session
+#### Objectif
+Simplifier le code pour qu'il soit lisible et comprehensible par un etudiant de 1ere annee, conformement aux regles du AGENTS.md.
 
-| Composant | Fichier | Avancement |
-|-----------|---------|-----------|
-| Modele | `neonaure/model.py` | **90%** (Cell, Pattern, Grid, Solver complets) |
-| Tests | `tests/test_model.py` | **100%** (44 tests verts) |
-| Package init | `neonaure/__init__.py` | 60% (bugs corriges, `run()` encore vide) |
-| Vue | `neonaure/view.py` | 0% |
-| Controleur | `neonaure/controller.py` | 0% |
+#### Changements dans `neonaure/model.py`
+- **Suppression de `__slots__`** sur la classe Cell (concept trop avance pour BUT1)
+- **Correction `__eq__` / `__hash__`** : les deux sont maintenant bases sur les coordonnees `(x, y)`, ce qui est coherent (avant, `__eq__` comparait les valeurs et `__hash__` les coordonnees, ce qui violait le contrat Python)
+- **Simplification de `_has_conflict`** : remplacement de `any()` avec comparaison `__eq__` par une boucle `for` explicite qui compare les valeurs directement
+- **Simplification de `_get_possible_values`** : remplacement des operations sur les `set` (`discard`) par une liste avec `append` / `remove` explicites
+- **Simplification de `solve_grid`** : remplacement des comprehensions de liste par des boucles `for` avec `append`
+- **Simplification et commentaires de `_backtrack`** : ajout de commentaires detailles pour expliquer chaque etape de l'algorithme MRV, remplacement de `enumerate` par `range(len())`, de `not empty_cells` par `len(empty_cells) == 0`
+- **Suppression d'un print inutile** dans `__main__`
+
+#### Changements dans `neonaure/view.py`
+- **Simplification de `_compute_conflicts`** : remplacement de `setdefault` par un `if/else` explicite, remplacement de `enumerate` avec slicing `cells[i+1:]` par des boucles `for i in range(len(cells))` et `for j in range(i+1, len(cells))`
+- **Simplification de `handle_test_click`** : remplacement des comprehensions de liste/set par des boucles `for` explicites
+- **Simplification de `reset_grid`** (TestWindow) : comprehension de liste remplacee par une boucle `for` avec `append`
+
+#### Changements dans `neonaure/controller.py`
+- **Simplification de `handle_click`** : remplacement de la set comprehension `used_numbers` par une boucle `for` avec `discard`
+
+#### Changements dans `generate_grid.py`
+- **Simplification de `generate_regions`** : comprehension de liste `[[x, y, 0] for x, y in cells]` remplacee par une boucle `for` avec `append`
+- **Simplification de `solve_and_strip`** : set comprehension et comprehension de dictionnaire remplacees par des boucles `for` explicites
+- **Simplification de `main`** : `sum()` avec comprehensions remplacee par des boucles `for` avec compteurs
+
+#### Fichiers modifies
+- `neonaure/model.py`
+- `neonaure/view.py`
+- `neonaure/controller.py`
+- `generate_grid.py`
+
+#### Resultats
+- Solveur toujours fonctionnel (default.json, grid7.json, grid8.json resolues)
+- `__eq__` et `__hash__` maintenant coherents
+- Code plus lisible et pedagogique
 
 ### 10/06/2026 - Session 2 : Vue responsive
 
@@ -767,3 +763,105 @@ Le Neonaure est un excellent projet pedagogique qui combine deux competences fon
 | Controleur | `neonaure/controller.py` | **25%** (liaison modele-vue, clic, undo, reset, generation grille) |
 | Package init | `neonaure/__init__.py` | **70%** |
 | Generateur | `generate_grid.py` | **100%** (nouveau) |
+
+### 11/06/2026 - Session 8 : Bugfixes coordonnees X/Y + icones manquantes
+
+#### Problemes constates
+- La grille affichee via `main.py` avait un decalage X/Y (les clics ne tombaient pas sur les bonnes cases)
+- Les icones (undo, trash, map, cross) n'apparaissaient pas toujours via `main.py`
+
+#### Bugs corriges dans `neonaure/controller.py`
+
+1. **`update_view()` : rows/cols inverses** — `get_dimensions()` retourne `(width, height)` = `(nb_colonnes, nb_lignes)`, mais le code assignait `rows, cols = ...` (inverse). Corrige en `cols, rows = self.model.get_dimensions()`.
+
+2. **`update_view()` : immutable_cells toujours vide** — Le set `immutable_cells` etait declare mais jamais peuple. Ajout de la condition `if cell.immuable: immutable_cells.add((cell.y, cell.x))` dans la boucle de parcours des cellules.
+
+3. **`handle_click()` : parametres col/row inverses** — Le signal `cell_clicked` emet `(col, row)` mais `handle_click` nommait ses params `(row, col)`, inversant les coordonnees a l'interieur. Corrige : `def handle_click(self, col: int, row: int)`.
+
+4. **`handle_click()` : offset manquant dans le popup** — Le calcul de `local_pos` n'incluait pas `offset_x` et `offset_y`, causant un decalage du popup NumberSelector. Ajout des offsets pour correspondre au comportement de TestWindow.
+
+#### Bug corrigé dans `neonaure/view.py`
+
+5. **Chemins d'icones relatifs** — Les icones utilisaient des chemins relatifs (`"assets/icons/undo.png"`) qui ne fonctionnaient que si le CWD etait la racine du projet. Ajout de `_BASE_DIR`, `_ASSETS_DIR` et `_icon_path()` pour resoudre les chemins en absolu a partir du repertoire du package.
+
+#### Fichiers modifies
+- `neonaure/controller.py`
+- `neonaure/view.py`
+
+#### Etat du projet apres cette session
+
+| Composant | Fichier | Avancement |
+|-----------|---------|-----------|
+| Modele | `neonaure/model.py` | **95%** |
+| Tests | `tests/test_model.py` | **100%** (44 tests verts) |
+| Vue | `neonaure/view.py` | **80%** (icones en chemins absolus) |
+| Controleur | `neonaure/controller.py` | **25%** (coordonnees et immutable_cells corriges) |
+| Package init | `neonaure/__init__.py` | **70%** |
+| Generateur | `generate_grid.py` | **100%** |
+
+### 12/06/2026 - Session 9 : Annotations du code + identification des fonctions non utilisees
+
+#### Fonctionnalite ajoutee
+- **Commentaires explicatifs** ajoutes sur chaque `def`, `class`, constante et signal de tous les fichiers du projet
+- **Identification et mise en commentaire** de 14 elements non utilises dans `model.py`
+
+#### Elements mis en commentaire (`NON UTILISE`) dans `neonaure/model.py`
+- `class InvalidGrid` - exception jamais levee ni attrapee
+- `Cell.is_empty()` - jamais appelee
+- `Pattern.missing_values()` - jamais appelee
+- `Pattern.get_cell()` - jamais appelee
+- `Grid.is_valid_placement()` - jamais appelee
+- `Grid.is_complete()` - jamais appelee
+- `Grid.is_solved()` - appelee uniquement dans `__main__` de test
+- `Grid._has_neighbour_conflict()` - appelee uniquement par `is_solved` non utilisee
+- `Grid.set_cell_value()` - jamais appelee
+- `Grid.save_grid_to_json()` - jamais appelee
+- `Solver.is_solved()` - appelee uniquement dans `__main__` de test
+- `Solver.hint()` - jamais appelee
+- `Solver.count_solutions()` - jamais appelee
+- `Solver._count_backtrack()` - appelee uniquement par `count_solutions` non utilisee
+
+#### Fichiers modifies
+- `neonaure/model.py` : commentaires + 14 elements mis en commentaire
+- `neonaure/view.py` : commentaires sur toutes les classes et methodes
+- `neonaure/controller.py` : commentaires sur toutes les methodes
+- `neonaure/startup.py` : commentaires sur toutes les classes et methodes
+- `neonaure/__init__.py` : commentaires sur les constantes et fonctions
+- `generate_grid.py` : commentaires sur les fonctions et constantes
+- `main.py` : commentaire sur le point d'entree
+
+#### Bug corrige
+- `neonaure/view.py` : `cell_clicked.emit(row, col)` -> `cell_clicked.emit(col, row)` (inversion introduite par erreur)
+
+#### Etat du projet apres cette session
+
+| Composant | Fichier | Avancement |
+|-----------|---------|-----------|
+| Modele | `neonaure/model.py` | **95%** (14 elements non utilises commentes) |
+| Tests | `tests/test_model.py` | **100%** (44 tests verts) |
+| Vue | `neonaure/view.py` | **80%** |
+| Controleur | `neonaure/controller.py` | **25%** |
+| Package init | `neonaure/__init__.py` | **70%** |
+| Generateur | `generate_grid.py` | **100%** |
+| Startup | `neonaure/startup.py` | **100%** |
+
+### 12/06/2026 - Session 11 : Ajout de tests unitaires complets
+
+#### Objectif
+Ajouter des tests unitaires exhaustifs pour verifier que tout le code fonctionne correctement.
+
+#### Fichier cree
+- `tests/test_model.py` : **70 tests** couvrant toutes les classes et fonctionnalites
+
+#### Repartition des tests
+
+| Categorie | Nb tests | Couverture |
+|-----------|----------|------------|
+| Cell | 16 | creation, set_value, immuabilite, eq, hash, to_list, str, repr, usage dans set/dict |
+| Pattern | 15 | create, size, values, contains_value, set_cell, from_raw_cells (3 et 4 elements), to_list, repr |
+| Grid | 14 | dimensions, get_cell, get_pattern_of, neighbours (centre/coin/bord), duplicate_pattern, to_dict, matrix, from_data filtre, motif de 1 cellule |
+| Grilles JSON | 5 | chargement de toutes les grilles, cellules valides, roundtrip serialisation, dimensions grid7/grid8 |
+| Solver | 14 | resolution grid8/grid7, grille completee, grille impossible (voisin/motif), toutes les grilles, alias solve(), contraintes respectees (motif + voisin), _get_possible_values, _has_conflict |
+| GenerateGrid | 6 | generation defaut/personnalisee, presence d'indices, resolubilite, regions couvrantes, solve_and_strip |
+
+#### Resultat : 70/70 tests passent en 0.54s

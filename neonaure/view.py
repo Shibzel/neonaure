@@ -15,6 +15,7 @@ forwarded to the controller.
 
 from __future__ import annotations
 
+import os
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QSpinBox, QFormLayout
 from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon
@@ -25,6 +26,16 @@ if TYPE_CHECKING:
     from .controller import Controller
 
 
+# Chemins de base du projet et du dossier d'assets
+_BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ASSETS_DIR: str = os.path.join(_BASE_DIR, "assets", "icons")
+
+# Renvoie le chemin absolu d'une icone dans le dossier assets
+def _icon_path(name: str) -> str:
+    return os.path.join(_ASSETS_DIR, name)
+
+
+# Popup de selection d'un nombre pour une cellule
 class NumberSelector(QDialog):
     def __init__(self, parent: QWidget, options: list[int], cell_global_pos: QPoint, cell_size: int) -> None:
         super().__init__(parent)
@@ -53,7 +64,7 @@ class NumberSelector(QDialog):
 
         # Bouton croix pour fermer le popup
         close_btn: QPushButton = QPushButton()
-        close_btn.setIcon(QIcon("assets/icons/cross.png"))
+        close_btn.setIcon(QIcon(_icon_path("cross.png")))
         close_btn.setIconSize(QSize(btn_size - 8, btn_size - 8))
         close_btn.setFixedSize(btn_size, btn_size)
         close_btn.clicked.connect(self.reject)
@@ -77,11 +88,13 @@ class NumberSelector(QDialog):
 
         self.move(x, y)
 
+    # Enregistre le nombre choisi et ferme le popup
     def select_number(self, n: int) -> None:
         self.selected_number = n
         self.accept()
 
 
+# Widget d'affichage et d'interaction avec la grille de jeu
 class GridView(QWidget):
     cell_clicked: pyqtSignal = pyqtSignal(int, int)
 
@@ -100,6 +113,7 @@ class GridView(QWidget):
         self.hovered_row: int = -1
         self.hovered_col: int = -1
 
+    # Calcule la taille d'une cellule pour que la grille tienne dans le widget
     def _compute_cell_size(self) -> int:
         if self.rows == 0 or self.cols == 0:
             return 50
@@ -109,47 +123,64 @@ class GridView(QWidget):
         cell_h: int = available_h // self.rows
         return max(20, min(cell_w, cell_h))
 
+    # Centre la grille dans le widget
     def _compute_offset(self) -> None:
         grid_w: int = self.cols * self.cell_size
         grid_h: int = self.rows * self.cell_size
         self.offset_x = max(0, (self.width() - grid_w) // 2)
         self.offset_y = max(0, (self.height() - grid_h) // 2)
 
+    # Detecte les conflits : valeurs identiques entre voisins ou dans un meme motif
+    # Retourne un ensemble de tuples (ligne, colonne) des cellules en conflit
     def _compute_conflicts(self) -> set[tuple[int, int]]:
-        conflicts: set[tuple[int, int]] = set()
+        conflicts = set()
+
+        # 1er check : conflit de voisinage
+        # Pour chaque cellule qui a une valeur, on regarde si un voisin a la meme
         for (r, c), value in self.values.items():
+            # On teste les 8 directions autour de la cellule
             for dr in (-1, 0, 1):
                 for dc in (-1, 0, 1):
                     if dr == 0 and dc == 0:
                         continue
-                    nr: int = r + dr
-                    nc: int = c + dc
+                    nr = r + dr
+                    nc = c + dc
+                    # Si le voisin existe et a la meme valeur, c'est un conflit
                     if self.values.get((nr, nc)) == value:
                         conflicts.add((r, c))
 
+        # 2eme check : conflit de motif (doublon dans un meme motif)
         if self.pattern_membership:
-            pattern_cells: dict[str, list[tuple[int, int]]] = {}
+            # On regroupe les cellules par motif
+            pattern_cells = {}
             for pos, pname in self.pattern_membership.items():
-                pattern_cells.setdefault(pname, []).append(pos)
+                if pname not in pattern_cells:
+                    pattern_cells[pname] = []
+                pattern_cells[pname].append(pos)
 
+            # Pour chaque motif, on compare chaque paire de cellules
             for cells in pattern_cells.values():
-                for i, (r1, c1) in enumerate(cells):
-                    v1: int | None = self.values.get((r1, c1))
+                for i in range(len(cells)):
+                    r1, c1 = cells[i]
+                    v1 = self.values.get((r1, c1))
                     if v1 is None:
                         continue
-                    for r2, c2 in cells[i + 1:]:
+                    for j in range(i + 1, len(cells)):
+                        r2, c2 = cells[j]
                         if self.values.get((r2, c2)) == v1:
                             conflicts.add((r1, c1))
                             conflicts.add((r2, c2))
 
         return conflicts
 
+    # Recalcule la taille des cellules et le centrage au redimensionnement
     def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         super().resizeEvent(event)
         self.update()
 
+    # Met a jour les donnees affichees par la grille
     def set_data(
         self,
         rows: int,
@@ -170,6 +201,7 @@ class GridView(QWidget):
         self._compute_offset()
         self.update()
 
+    # Gere le survol des cellules pour le highlight
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         x_rel: int = event.pos().x() - self.offset_x
         y_rel: int = event.pos().y() - self.offset_y
@@ -187,11 +219,13 @@ class GridView(QWidget):
                 self.hovered_col = -1
                 self.update()
 
+    # Retire le highlight quand la souris quitte le widget
     def leaveEvent(self, event: QEvent) -> None:  # type: ignore[override]
         self.hovered_row = -1
         self.hovered_col = -1
         self.update()
 
+    # Emet un signal quand l'utilisateur clique sur une cellule modifiable
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         x_rel: int = event.pos().x() - self.offset_x
         y_rel: int = event.pos().y() - self.offset_y
@@ -202,8 +236,9 @@ class GridView(QWidget):
             local_y: int = y_rel % self.cell_size
             margin: int = 4
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
-                self.cell_clicked.emit(row, col)
+                self.cell_clicked.emit(col, row)
 
+    # Dessine la grille : cellules, valeurs, bordures épaisses et conflits
     def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
         painter: QPainter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -256,6 +291,7 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
+# Dialogue pour choisir la taille d'une nouvelle grille
 class GridSizeDialog(QDialog):
     """Popup pour choisir les dimensions X/Y de la nouvelle grille."""
 
@@ -281,6 +317,7 @@ class GridSizeDialog(QDialog):
         layout.addRow(confirm_btn)
 
 
+# Fenetre principale du jeu avec la grille et les boutons
 class MainWindow(QMainWindow):
     def __init__(self, controller: Controller) -> None:
         super().__init__()
@@ -308,7 +345,7 @@ class MainWindow(QMainWindow):
         )
 
         self.undo_button: QPushButton = QPushButton()
-        self.undo_button.setIcon(QIcon("assets/icons/undo.png"))
+        self.undo_button.setIcon(QIcon(_icon_path("undo.png")))
         self.undo_button.setIconSize(QSize(40, 40))
         self.undo_button.setFixedSize(56, 56)
         self.undo_button.setToolTip("Annuler le dernier coup")
@@ -318,7 +355,7 @@ class MainWindow(QMainWindow):
         btn_panel.addWidget(self.undo_button)
 
         self.reset_button: QPushButton = QPushButton()
-        self.reset_button.setIcon(QIcon("assets/icons/trash.png"))
+        self.reset_button.setIcon(QIcon(_icon_path("trash.png")))
         self.reset_button.setIconSize(QSize(40, 40))
         self.reset_button.setFixedSize(56, 56)
         self.reset_button.setToolTip("Réinitialiser la grille")
@@ -328,7 +365,7 @@ class MainWindow(QMainWindow):
         btn_panel.addWidget(self.reset_button)
 
         self.map_button: QPushButton = QPushButton()
-        self.map_button.setIcon(QIcon("assets/icons/map.png"))
+        self.map_button.setIcon(QIcon(_icon_path("map.png")))
         self.map_button.setIconSize(QSize(40, 40))
         self.map_button.setFixedSize(56, 56)
         self.map_button.setToolTip("Nouvelle carte aléatoire")
@@ -344,6 +381,7 @@ class MainWindow(QMainWindow):
         self.grid_view.cell_clicked.connect(self.controller.handle_click)  # type: ignore[arg-type]
         self.resize(560, 500)
 
+    # Ouvre le dialogue de generation d'une nouvelle carte
     def _on_map_clicked(self) -> None:
         """Ouvre le dialogue de taille puis demande au controller de générer."""
         dialog: GridSizeDialog = GridSizeDialog(self)
@@ -354,6 +392,7 @@ class MainWindow(QMainWindow):
             )
 
 
+# Grille de test avec 15 motifs predefinis
 test_data: dict[str, list[list[int]]] = {
     "motif1": [[0,0,0], [1,0,0], [0,1,0], [1,1,3], [2,1,0]],
     "motif2": [[2,0,5], [3,0,0], [4,0,0], [4,1,0], [5,0,0]],
@@ -373,6 +412,7 @@ test_data: dict[str, list[list[int]]] = {
 }
 
 
+# Transforme les donnees brutes en structures utilisables par GridView
 def prepare_test_data(
     data: dict[str, list[list[int]]],
 ) -> tuple[int, int, dict[tuple[int, int], int], list[tuple[int, int, int, int]], set[tuple[int, int]], dict[tuple[int, int], str]]:
@@ -406,6 +446,7 @@ def prepare_test_data(
     return rows, cols, values, thick_borders, immutable_cells, pattern_membership
 
 
+# Fenetre de test standalone pour tester la vue sans le controleur
 class TestWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -434,7 +475,7 @@ class TestWindow(QMainWindow):
         )
 
         self.undo_button: QPushButton = QPushButton()
-        self.undo_button.setIcon(QIcon("assets/icons/undo.png"))
+        self.undo_button.setIcon(QIcon(_icon_path("undo.png")))
         self.undo_button.setIconSize(QSize(40, 40))
         self.undo_button.setFixedSize(56, 56)
         self.undo_button.setToolTip("Annuler le dernier coup")
@@ -444,7 +485,7 @@ class TestWindow(QMainWindow):
         btn_panel.addWidget(self.undo_button)
 
         self.reset_button: QPushButton = QPushButton()
-        self.reset_button.setIcon(QIcon("assets/icons/trash.png"))
+        self.reset_button.setIcon(QIcon(_icon_path("trash.png")))
         self.reset_button.setIconSize(QSize(40, 40))
         self.reset_button.setFixedSize(56, 56)
         self.reset_button.setToolTip("Réinitialiser la grille")
@@ -471,28 +512,33 @@ class TestWindow(QMainWindow):
         self.values: dict[tuple[int, int], int] = val
         self.view.cell_clicked.connect(self.handle_test_click)  # type: ignore[arg-type]
 
+    # Gere le clic sur une cellule en mode test
     def handle_test_click(self, col: int, row: int) -> None:
+        # Si la cellule est immuable (pre-remplie), on ne fait rien
         if (row, col) in self.immutable_cells:
             return
 
-        current_pattern: str | None = self.pattern_membership.get((row, col))
+        # On cherche a quel motif appartient cette cellule
+        current_pattern = self.pattern_membership.get((row, col))
         if not current_pattern:
             return
 
-        pattern_cells: list[tuple[int, int]] = [
-            (r, c) for (r, c), p in self.pattern_membership.items() if p == current_pattern
-        ]
-        pattern_size: int = len(pattern_cells)
+        # On recupere toutes les cellules du meme motif
+        pattern_cells = []
+        for (r, c), p in self.pattern_membership.items():
+            if p == current_pattern:
+                pattern_cells.append((r, c))
+        pattern_size = len(pattern_cells)
 
-        possible_numbers: set[int] = set(range(1, pattern_size + 1))
-        used_numbers: set[int] = {
-            self.values.get((r, c))
-            for r, c in pattern_cells
-            if self.values.get((r, c)) is not None
-            and (r, c) in self.immutable_cells
-            and (r, c) != (row, col)
-        }
-        remaining_options: list[int] = sorted(list(possible_numbers - used_numbers))
+        # On calcule les numeros encore disponibles
+        # (tous les numeros de 1 a la taille du motif, moins ceux deja utilises)
+        possible_numbers = set(range(1, pattern_size + 1))
+        for r, c in pattern_cells:
+            if (r, c) in self.immutable_cells and (r, c) != (row, col):
+                val = self.values.get((r, c))
+                if val is not None:
+                    possible_numbers.discard(val)
+        remaining_options = sorted(list(possible_numbers))
 
         if not remaining_options:
             return
@@ -520,6 +566,7 @@ class TestWindow(QMainWindow):
                 self.pattern_membership,
             )
 
+    # Annule le dernier coup joue en mode test
     def undo(self) -> None:
         if not self.history:
             return
@@ -534,10 +581,13 @@ class TestWindow(QMainWindow):
             self.pattern_membership,
         )
 
+    # Reinitialise la grille en supprimant les valeurs non immuables
     def reset_grid(self) -> None:
-        keys_to_remove: list[tuple[int, int]] = [
-            pos for pos in self.values if pos not in self.immutable_cells
-        ]
+        # On recupere les cles a supprimer (cellules non immuables)
+        keys_to_remove = []
+        for pos in self.values:
+            if pos not in self.immutable_cells:
+                keys_to_remove.append(pos)
         for key in keys_to_remove:
             del self.values[key]
         self.history.clear()
