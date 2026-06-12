@@ -865,3 +865,51 @@ Ajouter des tests unitaires exhaustifs pour verifier que tout le code fonctionne
 | GenerateGrid | 6 | generation defaut/personnalisee, presence d'indices, resolubilite, regions couvrantes, solve_and_strip |
 
 #### Resultat : 70/70 tests passent en 0.54s
+
+### 12/06/2026 - Session 12 : Condition de victoire + menu victoire
+
+#### Fonctionnalite ajoutee
+- **Condition de victoire** : quand la grille est entierement remplie sans aucune erreur (pas de conflit voisinage, pas de doublon dans les motifs), un dialogue de victoire s'affiche
+- **Menu victoire** : popup avec le message "Bravo, vous avez gagne !" et un bouton "Retour au menu"
+
+#### Modifications
+
+**`neonaure/model.py`** :
+- Methode `Grid.is_complete()` : verifie que toutes les cellules sont remplies, qu'il n'y a pas de conflit entre voisins, et qu'il n'y a pas de doublon dans les motifs. Retourne `True` si la grille est complete et valide.
+
+**`neonaure/view.py`** :
+- Import `QLabel` ajoute
+- Nouvelle classe `VictoryDialog(QDialog)` : popup de victoire avec un texte de felicitation et un bouton "Retour au menu"
+
+**`neonaure/controller.py`** :
+- Import `VictoryDialog` ajoute
+- Dans `handle_click()` : apres chaque coup joue, appel de `self.model.is_complete()` et affichage du `VictoryDialog` si la grille est complete
+
+#### Tests ajoutes dans `tests/test_model.py`
+- `test_is_complete_empty_grid` : grille vide -> False
+- `test_is_complete_with_empty_cell` : grille partiellement remplie -> False
+- `test_is_complete_with_neighbor_conflict` : grille remplie mais avec conflit voisin -> False
+- `test_is_complete_with_pattern_duplicate` : grille remplie mais avec doublon motif -> False
+- `test_is_complete_solved_grid` : grille valide complete -> True
+- `test_is_complete_after_solver` : grille resolue par le solver -> True
+
+#### Fichiers modifies
+- `neonaure/model.py`
+- `neonaure/view.py`
+- `neonaure/controller.py`
+- `tests/test_model.py`
+
+#### Resultats
+- **76/76 tests passent** en 0.64s
+
+#### Etat du projet apres cette session
+
+| Composant | Fichier | Avancement |
+|-----------|---------|-----------|
+| Modele | `neonaure/model.py` | **95%** |
+| Tests | `tests/test_model.py` | **100%** (76 tests verts) |
+| Vue | `neonaure/view.py` | **85%** (grille responsive, popup, hover, conflits, boutons, dialogue victoire) |
+| Controleur | `neonaure/controller.py` | **30%** (liaison modele-vue, clic, undo, reset, generation, victoire) |
+| Package init | `neonaure/__init__.py` | **70%** |
+| Generateur | `generate_grid.py` | **100%** |
+| Startup | `neonaure/startup.py` | **100%** |

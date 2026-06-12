@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import os
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSpinBox, QFormLayout
-from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QIcon
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QPushButton, QGridLayout, QHBoxLayout, QVBoxLayout, QSizePolicy, QSpinBox, QFormLayout, QLabel
+from PyQt6.QtGui import QPainter, QPen, QColor, QFont, QResizeEvent, QMouseEvent, QPaintEvent, QPixmap, QIcon
 from PyQt6.QtCore import Qt, QRect, pyqtSignal, QPoint, QEvent, QSize
 from typing import TYPE_CHECKING
 
@@ -93,7 +93,30 @@ class NumberSelector(QDialog):
         self.accept()
 
 
-# Widget for displaying and interacting with the game grid
+# Dialogue de victoire affiche quand la grille est terminee sans erreur
+class VictoryDialog(QDialog):
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Victoire !")
+        self.setFixedSize(300, 200)
+
+        layout = QVBoxLayout(self)
+
+        label = QLabel("Bravo, vous avez gagné !")
+        label.setFont(QFont("Arial", 16))
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(label)
+
+        layout.addSpacing(20)
+
+        menu_btn = QPushButton("Retour au menu")
+        menu_btn.setFixedSize(180, 40)
+        menu_btn.setFont(QFont("Arial", 12))
+        menu_btn.clicked.connect(self.accept)
+        layout.addWidget(menu_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+
+# Widget d'affichage et d'interaction avec la grille de jeu
 class GridView(QWidget):
     cell_clicked: pyqtSignal = pyqtSignal(int, int)
 

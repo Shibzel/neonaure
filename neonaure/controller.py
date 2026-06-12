@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QPoint
 
-from .view import MainWindow, NumberSelector
+from .view import MainWindow, NumberSelector, VictoryDialog
 from .model import Grid, Pattern, Cell
 
 if TYPE_CHECKING:
@@ -110,8 +110,17 @@ class Controller:
         if popup.exec():
             new_number: int = popup.selected_number
             self._history.append((target_cell.x, target_cell.y, target_cell.value))
-            target_cell.set_value(new_number)
+            # Si on clique sur le meme nombre, on l'enleve (toggle)
+            if new_number == target_cell.value:
+                target_cell.set_value(0)
+            else:
+                target_cell.set_value(new_number)
             self.update_view()
+
+            # On verifie si la grille est complete et sans erreur
+            if self.model.is_complete():
+                dialog = VictoryDialog(self.view)
+                dialog.exec()
 
     # Annule le dernier coup joué en restaurant l'ancienne valeur
     def undo(self) -> None:

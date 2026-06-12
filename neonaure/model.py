@@ -188,6 +188,33 @@ class Grid:
     def get_dimensions(self) -> tuple[int, int]:
         return self.width, self.height
 
+    # Verifie si la grille est remplie et sans erreur
+    # Toutes les cellules doivent avoir une valeur non-nulle,
+    # et il ne doit pas y avoir de conflit (voisins identiques ou doublon dans un motif)
+    def is_complete(self) -> bool:
+        # On verifie que toutes les cellules sont remplies
+        for pattern in self.patterns:
+            for cell in pattern.cells:
+                if cell.value == 0:
+                    return False
+
+        # On verifie qu'il n'y a pas de conflit entre voisins
+        solver = Solver(self)
+        for pattern in self.patterns:
+            for cell in pattern.cells:
+                if solver._has_conflict(cell):
+                    return False
+
+        # On verifie qu'il n'y a pas de doublon dans chaque motif
+        for pattern in self.patterns:
+            values_seen = []
+            for cell in pattern.cells:
+                if cell.value in values_seen:
+                    return False
+                values_seen.append(cell.value)
+
+        return True
+
     # Retourne la cellule aux coordonnées données, ou None
     def get_cell(self, x: int, y: int) -> Cell | None:
         if 0 <= y < self.height and 0 <= x < self.width:
