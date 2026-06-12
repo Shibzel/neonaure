@@ -913,3 +913,50 @@ Ajouter des tests unitaires exhaustifs pour verifier que tout le code fonctionne
 | Package init | `neonaure/__init__.py` | **70%** |
 | Generateur | `generate_grid.py` | **100%** |
 | Startup | `neonaure/startup.py` | **100%** |
+
+### 12/06/2026 - Session 13 : Fix victoire retour menu + unlock grille suivante + fix croix NumberSelector
+
+#### Bugs corriges
+- **Victoire ne retournait pas au menu** : `VictoryDialog` fermait juste le popup sans revenir au StartupWindow. Modifie `__init__.py` pour boucler startup ↔ jeu, et le controleur ferme la vue avec un flag `_return_to_menu`.
+- **Croix NumberSelector ne fermait plus le popup** : change `self.reject` en `lambda checked=False: self.reject()` + ajout cursor et tooltip.
+- **Unlock grille suivante a la victoire** : le controleur appelle `unlock_next_grid()` avant d'afficher le VictoryDialog, debloquant la prochaine grille dans `progress.json`.
+
+#### Modifications
+
+**`neonaure/__init__.py`** :
+- `run()` transforme en boucle `while True` : startup → jeu → victoire → retour startup si voulu, sinon break
+- Suppression du `sys.exit()` pour permettre le retour au menu
+
+**`neonaure/controller.py`** :
+- Import `unlock_next_grid` depuis `startup.py`
+- Stockage du chemin fichier dans `self._file_path`
+- Ajout flag `self._return_to_menu`
+- A la victoire : appel `unlock_next_grid(self._file_path)` puis affiche VictoryDialog
+
+**`neonaure/view.py`** :
+- `NumberSelector` : croix utilise `lambda checked=False: self.reject()` au lieu de `self.reject`, ajout cursor et tooltip
+
+**`AGENTS.md`** :
+- Ajout section Architecture MVC complete avec description de chaque classe et methode du controleur, vue, startup, et `__init__.py`
+
+#### Fichiers modifies
+- `neonaure/__init__.py`
+- `neonaure/controller.py`
+- `neonaure/view.py`
+- `AGENTS.md`
+- `compte_rendu/compte_rendu.md`
+
+#### Resultats
+- **76/76 tests passent**
+
+#### Etat du projet apres cette session
+
+| Composant | Fichier | Avancement |
+|-----------|---------|-----------|
+| Modele | `neonaure/model.py` | **95%** |
+| Tests | `tests/test_model.py` | **100%** (76 tests verts) |
+| Vue | `neonaure/view.py` | **85%** |
+| Controleur | `neonaure/controller.py` | **40%** (clic, undo, reset, generation, victoire, unlock) |
+| Package init | `neonaure/__init__.py` | **80%** (boucle startup ↔ jeu) |
+| Generateur | `generate_grid.py` | **100%** |
+| Startup | `neonaure/startup.py` | **100%** |

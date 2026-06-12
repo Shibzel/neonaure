@@ -2,7 +2,9 @@
 Neonaure - Controller module
 
 This module acts as an intermediary between the model and the view:
-- TODO
+- Handles user interactions (clicks, undo, reset, grid generation)
+- Checks victory condition and unlocks next grid
+- Manages navigation between game and startup menu
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from PyQt6.QtCore import QPoint
 
 from .view import MainWindow, NumberSelector, VictoryDialog
 from .model import Grid, Pattern, Cell
+from .startup import unlock_next_grid
 
 if TYPE_CHECKING:
     pass
@@ -23,9 +26,11 @@ class Controller:
 
     # Initialise le modèle depuis un fichier JSON, crée la vue et l'historique des coups
     def __init__(self, file_path: str) -> None:
+        self._file_path: str = file_path
         self.model: Grid = Grid.from_json(file_path)
         self.view: MainWindow = MainWindow(self)
         self._history: list[tuple[int, int, int]] = []
+        self._return_to_menu: bool = False
         self.update_view()
 
     # Synchronise l'affichage de la vue avec l'état actuel du modèle
@@ -119,8 +124,14 @@ class Controller:
 
             # On verifie si la grille est complete et sans erreur
             if self.model.is_complete():
+                # On debloque la grille suivante
+                unlock_next_grid(self._file_path)
+
                 dialog = VictoryDialog(self.view)
-                dialog.exec()
+                if dialog.exec():
+                    # Le joueur veut revenir au menu
+                    self._return_to_menu = True
+                    self.view.close()
 
     # Annule le dernier coup joué en restaurant l'ancienne valeur
     def undo(self) -> None:

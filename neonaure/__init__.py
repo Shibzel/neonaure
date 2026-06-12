@@ -27,37 +27,47 @@ DEFAULT_GRID: str = "./data/grids/default.json"
 
 
 # Lance le jeu (startup screen puis fenêtre principale)
+# Quand le joueur gagne et clique "Retour au menu", on reboucle
 def run(file: str = DEFAULT_GRID) -> None:
     """
-    Runs the game. Starts the startup screen, waits for a grid selection,
-    then launches the main game window.
+    Runs the game. Loops between startup screen and game window.
+    When the player wins and clicks "Retour au menu", goes back to startup.
     """
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
 
-    selected_file = None
+    while True:
+        selected_file = None
 
-    # Callback interne pour récupérer la grille sélectionnée
-    def on_game_start(path: str):
-        nonlocal selected_file
-        selected_file = path
+        # Callback interne pour récupérer la grille sélectionnée
+        def on_game_start(path: str):
+            nonlocal selected_file
+            selected_file = path
 
-    """1. Show the startup screen"""
-    app.setStyleSheet("QWidget { background-color: #1E1E1E; color: white; }")
-    startup = StartupWindow()
-    startup.start_game_signal.connect(on_game_start)
-    startup.show()
-    app.exec()
+        """1. Show the startup screen"""
+        app.setStyleSheet("QWidget { background-color: #1E1E1E; color: white; }")
+        startup = StartupWindow()
+        startup.start_game_signal.connect(on_game_start)
+        startup.show()
+        app.exec()
 
-    """2. If a file was selected, launch the game"""
-    if selected_file:
-        """Set the style for the main game window"""
+        """2. If a file was selected, launch the game"""
+        if not selected_file:
+            break
+
         app.setStyleSheet("QWidget { background-color: white; color: black; }")
-        
+
         try:
             controller = Controller(selected_file)
             controller.view.show()
-            sys.exit(app.exec())
+            app.exec()
+
+            # Si le joueur veut revenir au menu, on reboucle
+            if controller._return_to_menu:
+                continue
+            else:
+                break
         except Exception as e:
             print(f"Error loading the grid: {e}")
+            break

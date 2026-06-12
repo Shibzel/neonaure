@@ -61,12 +61,14 @@ class NumberSelector(QDialog):
                 col = 0
                 row += 1
 
-        # Cross button to close the popup
+        # Bouton croix pour fermer le popup
         close_btn: QPushButton = QPushButton()
         close_btn.setIcon(QIcon(_icon_path("cross.png")))
         close_btn.setIconSize(QSize(btn_size - 8, btn_size - 8))
         close_btn.setFixedSize(btn_size, btn_size)
-        close_btn.clicked.connect(self.reject)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setToolTip("Fermer")
+        close_btn.clicked.connect(lambda checked=False: self.reject())
         layout.addWidget(close_btn, row, col)
 
         self.adjustSize()
