@@ -23,7 +23,7 @@ from .model import Grid
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GRIDS_DIR = os.path.join(BASE_DIR, "data", "grids")
 
-"""Color palette for patterns in the preview"""
+# Palette de couleurs pour les motifs dans l'aperçu
 PATTERN_COLORS = [
     QColor(0, 255, 204, 60),   
     QColor(255, 0, 204, 60),   
@@ -36,11 +36,14 @@ PATTERN_COLORS = [
 ]
 
 
+# Carte cliquable représentant une grille dans le carousel
 class GridCard(QPushButton):
     """Custom button representing a grid card in the carousel."""
 
+    # Signal personnalisé émis au clic, contient le chemin du fichier
     clicked_with_path = pyqtSignal(str)
 
+    # Construction de la carte (preview + nom + style néon)
     def __init__(self, file_path: str, parent=None):
         super().__init__(parent)
         self.file_path = file_path
@@ -92,6 +95,7 @@ class GridCard(QPushButton):
 
         self.clicked.connect(lambda: self.clicked_with_path.emit(self.file_path))
 
+    # Dessine un aperçu miniature de la grille
     def _render_preview(self):
         """Generates a QPixmap of the grid for the preview."""
         try:
@@ -176,6 +180,7 @@ class GridCard(QPushButton):
         except Exception as e:
             print(f"Error while rendering {self.file_path}: {e}")
 
+    # Animation de glow néon au survol
     def enterEvent(self, event):
         """Neon glow animation on hover enter"""
         self.anim = QPropertyAnimation(self.shadow, b"color")
@@ -185,6 +190,7 @@ class GridCard(QPushButton):
         self.anim.start()
         super().enterEvent(event)
 
+    # Animation de glow néon quand on sort du survol
     def leaveEvent(self, event):
         """Neon glow animation on hover leave"""
         self.anim = QPropertyAnimation(self.shadow, b"color")
@@ -195,11 +201,14 @@ class GridCard(QPushButton):
         super().leaveEvent(event)
 
 
+# Écran d'accueil avec carousel de grilles
 class StartupWindow(QMainWindow):
     """Startup window containing the grid selection carousel."""
     
+    # Signal émis quand une grille est sélectionnée
     start_game_signal = pyqtSignal(str) 
 
+    # Construction de l'écran (titre, carousel, bouton load)
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Neonaure - Startup")
@@ -288,6 +297,7 @@ class StartupWindow(QMainWindow):
         """Dynamically load grids"""
         self._populate_carousel()
 
+    # Style CSS des flèches du carousel
     def _arrow_style(self):
         """Returns the stylesheet for the carousel arrows."""
         return """
@@ -304,6 +314,7 @@ class StartupWindow(QMainWindow):
             }
         """
 
+    # Scanne le dossier des grilles et crée les cartes
     def _populate_carousel(self):
         """Scans the data/grids folder and generates the cards."""
         if not os.path.exists(GRIDS_DIR):
@@ -321,6 +332,7 @@ class StartupWindow(QMainWindow):
             card.clicked_with_path.connect(self._on_grid_selected)
             self.carousel_layout.addWidget(card)
 
+    # Fait défiler le carousel de manière fluide
     def _scroll_carousel(self, delta_x: int):
         """Scrolls the carousel smoothly."""
         scroll_bar = self.scroll_area.horizontalScrollBar()
@@ -330,11 +342,13 @@ class StartupWindow(QMainWindow):
         anim.setEndValue(scroll_bar.value() + delta_x)
         anim.start()
 
+    # Callback quand une grille est choisie
     def _on_grid_selected(self, file_path: str):
         """Called when the user clicks on a grid card."""
         self.start_game_signal.emit(file_path)
         self.close()
 
+    # Ouvre un dialogue de fichier pour charger une sauvegarde
     def _load_saved_game(self):
         """Opens a file dialog to load a saved game file."""
         file_path, _ = QFileDialog.getOpenFileName(

@@ -17,60 +17,59 @@ import json
 PATTERN_KEY_STARTS_WITH: str = "motif"
 
 
+# Exception levée quand un pattern est déjà chargé dans la grille
 class PatternAlreadyLoaded(RuntimeError):
     pass
 
 
+# Exception levée quand on tente de modifier une cellule immuable
 class CellIsImmuable(Exception):
     pass
 
 
-class InvalidGrid(Exception):
-    pass
-
-
+# Charge un fichier JSON et retourne son contenu sous forme de dict ou liste
 def load_json(file_path: str) -> dict | list:
     with open(file_path, "r") as file:
         return json.load(file)
 
 
-def save_json(file_path: str, data: dict | list) -> None:
-    with open(file_path, "w+") as file:
-        json.dump(data, file, indent=None)
-
-
+# Représente une cellule de la grille avec coordonnées, valeur et immuabilité
 class Cell:
-    __slots__ = ("x", "y", "value", "immuable")
 
+    # Initialise une cellule avec sa position, sa valeur et son statut d'immuabilité
     def __init__(self, x: int, y: int, value: int = 0, immuable: bool = False) -> None:
         self.x: int = x
         self.y: int = y
         self.value: int = value
         self.immuable: bool = immuable
 
+    # Affichage lisible de la cellule
     def __str__(self) -> str:
         return f"({self.x}, {self.y}) with value {self.value}"
 
+    # Représentation de debug
     def __repr__(self) -> str:
         return f"Cell(x={self.x}, y={self.y}, value={self.value}, immuable={self.immuable})"
 
+    # Deux cellules sont "egales" si elles sont a la meme position (x, y)
+    # Cela permet de comparer des cellules de maniere logique
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Cell):
             return False
-        if self.value == 0 and other.value == 0:
-            return False
-        return self.value == other.value
+        return self.x == other.x and self.y == other.y
 
+    # Le hash est base sur les coordonnees, ce qui est coherent avec __eq__
+    # (deux objets egaux doivent avoir le meme hash)
+    # Cela permet d'utiliser des Cell dans des set() ou comme cles de dict
     def __hash__(self) -> int:
         return hash((self.x, self.y))
 
+    # Sérialise la cellule en liste [x, y, valeur, immuable]
     def to_list(self) -> list[int | bool]:
         """Returns the cell data as a list [x, y, value, immuable]."""
         return [self.x, self.y, self.value, self.immuable]
 
-    def is_empty(self) -> bool:
-        return self.value == 0
-
+    # Modifie la valeur d'une cellule, lève une exception si immuable
     def set_value(self, value: int) -> None:
         """Sets the cell value. Raises CellIsImmuable if the cell cannot be modified."""
         if self.immuable:
@@ -78,9 +77,11 @@ class Cell:
         self.value = value
 
 
+# Représente un motif (région) de la grille, contenant plusieurs cellules
 class Pattern:
     """Represents a pattern (region, motif) in the grid."""
 
+    # Initialise un motif avec un nom et une liste de cellules
     def __init__(self, name: str, cells: list[Cell] | None = None) -> None:
         self.name: str = name
         self.cells: list[Cell] = cells or []
@@ -88,29 +89,24 @@ class Pattern:
     def __repr__(self) -> str:
         return f"Pattern(name={self.name!r}, cells={len(self.cells)} cells)"
 
+    # Sérialise le motif en liste de listes
     def to_list(self) -> list[list[int | bool]]:
         """Returns the pattern data as a list of cell lists."""
         return [cell.to_list() for cell in self.cells]
 
+    # Nombre de cellules dans le motif
     def size(self) -> int:
         return len(self.cells)
 
+    # Liste des valeurs déjà présentes dans le motif (sans les zéros)
     def values(self) -> list[int]:
         return [c.value for c in self.cells if c.value != 0]
 
-    def missing_values(self) -> list[int]:
-        used: set[int] = set(self.values())
-        return [v for v in range(1, self.size() + 1) if v not in used]
-
+    # Vérifie si une valeur est déjà présente dans le motif
     def contains_value(self, v: int) -> bool:
         return any(c.value == v for c in self.cells)
 
-    def get_cell(self, x: int, y: int) -> Cell | None:
-        for c in self.cells:
-            if c.x == x and c.y == y:
-                return c
-        return None
-
+    # Met à jour une cellule existante ou en ajoute une nouvelle au motif
     def set_cell(self, x: int, y: int, value: int, immuable: bool = False) -> None:
         """Updates the value of an existing cell, or adds a new cell if absent."""
         for cell in self.cells:
@@ -120,16 +116,17 @@ class Pattern:
         else:
             self.cells.append(Cell(x, y, value, immuable))
 
+    # Crée un Pattern à partir de données brutes (listes de coordonnées/valeurs)
     @classmethod
     def from_raw_cells(cls, name: str, raw_cells: list[list[int]]) -> Pattern:
         """Creates a Pattern instance from a raw list of cell data."""
         instance: Pattern = cls(name)
         for cell in raw_cells:
             # Logique d'immuabilité :
-            # Si la cellule a 4 éléments, cela veut dire qu'elle provient d'une save,
-            #   donc on vérifie la 4ème valeur pour sa valeur d'immuabilité (True = non mutable)
-            # Si il n'y a que 3 éléments, alors la cellule est immuable car chargée
-            #   depuis un json externe (nouvelle partie)
+            # Si la cellule a 4 éléments, elle provient d'une save,
+            #   on vérifie le 4ème élément pour l'immuabilité
+            # Si il n'y a que 3 éléments et valeur != 0, la cellule est immuable
+            #   car chargée depuis un json externe (nouvelle partie)
             immuable: bool = False
             if (len(cell) == 3) and (cell[2] != 0):
                 immuable = True
@@ -139,9 +136,11 @@ class Pattern:
         return instance
 
 
+# Représente la grille de jeu complète avec ses patterns et sa matrice 2D
 class Grid:
     """Represents the Neonaure game grid, including dimensions, cells, and patterns."""
 
+    # Construit la grille à partir d'une liste de patterns
     def __init__(self, patterns: list[Pattern]) -> None:
         self.patterns: list[Pattern] = []
         for pattern in patterns:
@@ -152,16 +151,19 @@ class Grid:
         self.matrix: list[list[Cell | None]] = [[None for _ in range(self.width)] for _ in range(self.height)]
         self._fill_matrix()
 
+    # Sérialise la grille en dictionnaire {nom_du_pattern: données}
     def to_dict(self) -> dict[str, list[list[int | bool]]]:
         """Returns the grid data as a dictionary keyed by pattern names."""
         return {pattern.name: pattern.to_list() for pattern in self.patterns}
 
+    # Remplit la matrice 2D avec les références des cellules
     def _fill_matrix(self) -> None:
         """Populates the 2D matrix with cell references based on their coordinates."""
         for pattern in self.patterns:
             for cell in pattern.cells:
                 self.matrix[cell.y][cell.x] = cell
 
+    # Ajoute un pattern, lève une erreur si le nom existe déjà
     def _add_pattern(self, pattern: Pattern) -> None:
         """Adds a pattern to the grid. Raises PatternAlreadyLoaded if the name exists."""
         for p in self.patterns:
@@ -171,6 +173,7 @@ class Grid:
                 )
         self.patterns.append(pattern)
 
+    # Calcule la largeur et la hauteur de la grille à partir des coordonnées max
     def _compute_dimensions(self) -> None:
         self.height = 0
         self.width = 0
@@ -181,14 +184,17 @@ class Grid:
                 if cell.y >= self.height:
                     self.height = cell.y + 1
 
+    # Retourne (largeur, hauteur) de la grille
     def get_dimensions(self) -> tuple[int, int]:
         return self.width, self.height
 
+    # Retourne la cellule aux coordonnées données, ou None
     def get_cell(self, x: int, y: int) -> Cell | None:
         if 0 <= y < self.height and 0 <= x < self.width:
             return self.matrix[y][x]
         return None
 
+    # Retourne le pattern qui contient la cellule aux coordonnées données
     def get_pattern_of(self, x: int, y: int) -> Pattern | None:
         for pattern in self.patterns:
             for cell in pattern.cells:
@@ -196,44 +202,7 @@ class Grid:
                     return pattern
         return None
 
-    def is_valid_placement(self, x: int, y: int, value: int) -> bool:
-        pattern: Pattern | None = self.get_pattern_of(x, y)
-        if pattern is None:
-            return False
-        if value < 1 or value > pattern.size():
-            return False
-        if pattern.contains_value(value):
-            return False
-        for nb in self.neighbours(x, y):
-            if nb.value == value:
-                return False
-        return True
-
-    def is_complete(self) -> bool:
-        return all(c.value != 0 for p in self.patterns for c in p.cells)
-
-    def is_solved(self) -> bool:
-        if not self.is_complete():
-            return False
-        for pattern in self.patterns:
-            for cell in pattern.cells:
-                if self._has_neighbour_conflict(cell):
-                    return False
-        return True
-
-    def _has_neighbour_conflict(self, cell: Cell) -> bool:
-        for nb in self.neighbours(cell.x, cell.y):
-            if nb.value == cell.value and cell.value != 0:
-                return True
-        return False
-
-    def set_cell_value(self, x: int, y: int, value: int) -> bool:
-        cell: Cell | None = self.get_cell(x, y)
-        if cell is None or cell.immuable:
-            return False
-        cell.set_value(value)
-        return True
-
+    # Retourne la liste des 8 voisins directs d'une cellule
     def neighbours(self, x: int, y: int) -> list[Cell]:
         """Returns a list of the closest neighbours of a cell."""
         offsets: list[tuple[int, int]] = [
@@ -250,6 +219,7 @@ class Grid:
                     result.append(cell)
         return result
 
+    # Crée une grille à partir d'un dictionnaire de données de patterns
     @classmethod
     def from_data(cls, data: dict[str, list[list[int]]]) -> Grid:
         """Creates a Grid instance from a dictionary of pattern data."""
@@ -259,40 +229,33 @@ class Grid:
                 patterns.append(Pattern.from_raw_cells(key, val))
         return cls(patterns)
 
+    # Crée une grille à partir d'un chemin de fichier JSON
     @classmethod
     def from_json(cls, file_path: str) -> Grid:
         """Creates a Grid instance from a JSON file path."""
         data: dict[str, list[list[int]]] = load_json(file_path)  # type: ignore[assignment]
         return cls.from_data(data)
 
-    def save_grid_to_json(self, file_path: str) -> None:
-        """Saves the current grid state to a JSON file."""
-        save_json(file_path, self.to_dict())
 
 
+# Solveur de grille basé sur la coloration de graphe et le backtracking
 class Solver:
     """Solves the Neonaure grid using Graph Coloring theory and Backtracking."""
 
+    # Initialise le solveur avec la grille à résoudre
     def __init__(self, grid: Grid) -> None:
         self.grid: Grid = grid
-        self._solution_count: int = 0
-        self._max_count: int = 2
 
+    # Verifie si une cellule partage sa valeur avec un voisin
+    # On parcourt les 8 voisins et on regarde si l'un d'eux a la meme valeur
     def _has_conflict(self, cell: Cell) -> bool:
-        """Returns True if a cell shares its value with any of its neighbours."""
-        return any(
-            neighbour == cell
-            for neighbour in self.grid.neighbours(cell.x, cell.y)
-        )
+        neighbours = self.grid.neighbours(cell.x, cell.y)
+        for neighbour in neighbours:
+            if neighbour.value != 0 and neighbour.value == cell.value:
+                return True
+        return False
 
-    def is_solved(self) -> bool:
-        """Returns True if all cells have a non-zero value and no cell shares its value with a neighbour."""
-        return all(
-            cell.value != 0 and not self._has_conflict(cell)
-            for pattern in self.grid.patterns
-            for cell in pattern.cells
-        )
-
+    # Retourne le pattern qui contient la cellule donnée
     def _get_pattern_for_cell(self, cell: Cell) -> Pattern:
         """Retrieves the Pattern object containing the given cell."""
         for pattern in self.grid.patterns:
@@ -301,156 +264,117 @@ class Solver:
                     return pattern
         raise ValueError(f"Cell at ({cell.x}, {cell.y}) does not belong to any pattern.")
 
+    # Calcule les valeurs possibles pour une cellule
+    # On commence avec toutes les valeurs de 1 a la taille du motif
+    # puis on enleve celles qui sont deja prises par les voisins ou dans le motif
     def _get_possible_values(self, cell: Cell) -> list[int]:
-        """
-        Calculates the domain (possible values) for a cell based on Graph Coloring constraints.
-        A value is possible if it is not used by adjacent nodes (neighbours)
-        or nodes within the same clique (pattern).
-        """
-        pattern: Pattern = self._get_pattern_for_cell(cell)
-        n: int = len(pattern.cells)
-        possible_values: set[int] = set(range(1, n + 1))
+        pattern = self._get_pattern_for_cell(cell)
+        n = len(pattern.cells)
 
+        # Au debut, toutes les valeurs de 1 a n sont possibles
+        possible_values = []
+        for v in range(1, n + 1):
+            possible_values.append(v)
+
+        # On enleve les valeurs des voisins (contrainte de voisinage)
         for neighbour in self.grid.neighbours(cell.x, cell.y):
-            if neighbour.value != 0:
-                possible_values.discard(neighbour.value)
+            if neighbour.value != 0 and neighbour.value in possible_values:
+                possible_values.remove(neighbour.value)
 
+        # On enleve les valeurs deja presentes dans le motif (contrainte de motif)
         for p_cell in pattern.cells:
             if p_cell.value != 0 and p_cell is not cell:
-                possible_values.discard(p_cell.value)
+                if p_cell.value in possible_values:
+                    possible_values.remove(p_cell.value)
 
-        return list(possible_values)
+        return possible_values
 
+    # Resout la grille par backtracking
+    # D'abord on verifie qu'il n'y a pas de conflit dans l'etat initial
+    # puis on lance le backtracking sur les cases vides
     def solve_grid(self) -> bool:
-        """Fills the grid using backtracking. Returns True if solved."""
+        # Verification initiale : pas de conflit entre valeurs deja posees
         for pattern in self.grid.patterns:
             for cell in pattern.cells:
                 if cell.value != 0 and self._has_conflict(cell):
                     return False
+
+        # On verifie aussi qu'il n'y a pas de doublon dans chaque motif
+        for pattern in self.grid.patterns:
+            for cell in pattern.cells:
                 if cell.value != 0:
                     for p_cell in pattern.cells:
                         if p_cell is not cell and p_cell.value == cell.value:
                             return False
 
-        empty_cells: list[Cell] = [
-            cell for pattern in self.grid.patterns
-            for cell in pattern.cells if cell.value == 0
-        ]
+        # On recupere toutes les cellules vides (valeur == 0)
+        empty_cells = []
+        for pattern in self.grid.patterns:
+            for cell in pattern.cells:
+                if cell.value == 0:
+                    empty_cells.append(cell)
 
         return self._backtrack(empty_cells)
 
+    # Alias pour solve_grid
     def solve(self) -> bool:
         return self.solve_grid()
 
+    # Algorithme de backtracking recursif avec selection MRV
+    # MRV = Minimum Remaining Values : on choisit en priorite la case
+    # qui a le moins de valeurs possibles (elle est la plus contrainte)
     def _backtrack(self, empty_cells: list[Cell]) -> bool:
-        """Recursive backtracking algorithm to color the graph."""
-        if not empty_cells:
+        # S'il n'y a plus de cases vides, la grille est resolue
+        if len(empty_cells) == 0:
             return True
 
-        best_cell: Cell | None = None
-        best_options: list[int] = []
-        min_options: int = len(self.grid.patterns[0].cells) + 1 if self.grid.patterns else 0
-        best_index: int = -1
+        # On cherche la case avec le moins de valeurs possibles (heuristique MRV)
+        best_cell = None
+        best_options = []
+        min_options = 999  # nombre tres grand pour commencer
+        best_index = -1
 
-        for i, cell in enumerate(empty_cells):
-            options: list[int] = self._get_possible_values(cell)
+        for i in range(len(empty_cells)):
+            cell = empty_cells[i]
+            options = self._get_possible_values(cell)
 
+            # Si aucune valeur possible, on est dans une impasse
             if len(options) == 0:
                 return False
 
+            # Si cette case a moins d'options que la meilleure trouvee,
+            # on la garde
             if len(options) < min_options:
                 min_options = len(options)
                 best_cell = cell
                 best_options = options
                 best_index = i
+
+                # Si on a trouve une case avec 1 seule option, pas besoin
+                # de chercher plus loin, c'est forcement la meilleure
                 if min_options == 1:
                     break
 
+        # On retire la case choisie de la liste des cases vides
         empty_cells.pop(best_index)
 
+        # On essaie chaque valeur possible pour cette case
         for value in best_options:
             best_cell.set_value(value)
 
+            # On relance le backtracking sur les cases restantes
             if self._backtrack(empty_cells):
                 return True
 
+            # Si ca n'a pas marche, on remet la valeur a 0 et on essaie
+            # la valeur suivante (c'est le "retour sur trace")
             best_cell.set_value(0)
 
+        # Aucune valeur ne fonctionne, on remet la case dans la liste
+        # et on retourne False pour dire au parent de backtracker aussi
         empty_cells.insert(best_index, best_cell)
         return False
 
-    def hint(self) -> tuple[int, int, int] | None:
-        empty_cells: list[Cell] = [
-            cell for pattern in self.grid.patterns
-            for cell in pattern.cells if cell.value == 0
-        ]
-        if not empty_cells:
-            return None
-
-        best_cell: Cell | None = None
-        best_options: list[int] = []
-        min_options: int = len(self.grid.patterns[0].cells) + 1 if self.grid.patterns else 0
-
-        for cell in empty_cells:
-            options: list[int] = self._get_possible_values(cell)
-            if len(options) == 0:
-                continue
-            if len(options) < min_options:
-                min_options = len(options)
-                best_cell = cell
-                best_options = options
-                if min_options == 1:
-                    break
-
-        if best_cell is None or not best_options:
-            return None
-
-        return (best_cell.x, best_cell.y, best_options[0])
-
-    def count_solutions(self, max_count: int = 2) -> int:
-        empty_cells: list[Cell] = [
-            cell for pattern in self.grid.patterns
-            for cell in pattern.cells if cell.value == 0
-        ]
-        self._solution_count: int = 0
-        self._max_count: int = max_count
-        self._count_backtrack(empty_cells)
-        return self._solution_count
-
-    def _count_backtrack(self, empty_cells: list[Cell]) -> None:
-        if self._solution_count >= self._max_count:
-            return
-        if not empty_cells:
-            self._solution_count += 1
-            return
-
-        best_cell: Cell | None = None
-        best_options: list[int] = []
-        min_options: int = len(self.grid.patterns[0].cells) + 1 if self.grid.patterns else 0
-        best_index: int = -1
-
-        for i, cell in enumerate(empty_cells):
-            options: list[int] = self._get_possible_values(cell)
-            if len(options) == 0:
-                return
-            if len(options) < min_options:
-                min_options = len(options)
-                best_cell = cell
-                best_options = options
-                best_index = i
-                if min_options == 1:
-                    break
-
-        empty_cells.pop(best_index)
-
-        for value in best_options:
-            if self._solution_count >= self._max_count:
-                break
-            best_cell.set_value(value)
-            self._count_backtrack(empty_cells)
-            best_cell.set_value(0)
-
-        empty_cells.insert(best_index, best_cell)
 
 
 if __name__ == "__main__":
@@ -467,10 +391,9 @@ if __name__ == "__main__":
         print(nb.value, end="")
     print("")
 
-    solver: Solver = Solver(grid)
-    is_solved: bool = solver.solve_grid()
+    solver = Solver(grid)
+    is_solved = solver.solve_grid()
     print("solved ? ", is_solved)
-    print("is solved ? ", solver.is_solved())
     for row in grid.matrix:
         for cell in row:
             print(cell.value if cell is not None else ".", end="")
