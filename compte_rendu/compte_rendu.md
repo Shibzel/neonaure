@@ -957,6 +957,25 @@ Ajouter des tests unitaires exhaustifs pour verifier que tout le code fonctionne
 | Tests | `tests/test_model.py` | **100%** (76 tests verts) |
 | Vue | `neonaure/view.py` | **85%** |
 | Controleur | `neonaure/controller.py` | **40%** (clic, undo, reset, generation, victoire, unlock) |
-| Package init | `neonaure/__init__.py` | **80%** (boucle startup ↔ jeu) |
+| Package init | `neonaure/__init__.py` | **80%** (boucle startup  jeu) |
 | Generateur | `generate_grid.py` | **100%** |
 | Startup | `neonaure/startup.py` | **100%** |
+
+### 12/06/2026 - Session 14 : Simplification controller.py pour niveau BUT1
+
+#### Objectif
+Simplifier `neonaure/controller.py` pour que le code ressemble a celui d'un etudiant de 1ere annee, conformement aux regles du AGENTS.md.
+
+#### Changements dans `neonaure/controller.py`
+- **Suppression de `from __future__ import annotations`** : directive avancee inutile pour BUT1
+- **Suppression du bloc `TYPE_CHECKING`** : bloc vide qui n'apportait rien
+- **Suppression de toutes les annotations de type sur les variables locales** : conserve uniquement les type hints dans les signatures de methodes (parametres et retour)
+- **Simplification de `handle_click()`** : remplacement de `set(range(...))` + `discard` + `sorted` par une simple boucle `for` avec `append` puis `remove` pour construire la liste des options disponibles
+- **Suppression des annotations de type sur les attributs d'instance** : `self._file_path: str` devient `self._file_path`, etc.
+
+#### Fichiers modifies
+- `neonaure/controller.py`
+
+#### Resultats
+- **76/76 tests passent** en 0.46s
+- Fonctionnalite identique, code plus lisible et pedagogique

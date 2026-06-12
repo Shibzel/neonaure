@@ -18,17 +18,15 @@ import sys
 from PyQt6.QtWidgets import QApplication
 
 from .controller import Controller
-from .model import Cell, CellIsImmuable, Grid, Pattern, PatternAlreadyLoaded, Solver
-from .view import GridView, MainWindow, NumberSelector
 from .startup import StartupWindow
 
-# Chemin par défaut de la grille
-DEFAULT_GRID: str = "./data/grids/default.json"
+# Chemin par defaut de la grille
+DEFAULT_GRID = "./data/grids/default.json"
 
 
-# Lance le jeu (startup screen puis fenêtre principale)
+# Lance le jeu (startup screen puis fenetre principale)
 # Quand le joueur gagne et clique "Retour au menu", on reboucle
-def run(file: str = DEFAULT_GRID) -> None:
+def run(file=DEFAULT_GRID):
     """
     Runs the game. Loops between startup screen and game window.
     When the player wins and clicks "Retour au menu", goes back to startup.
@@ -38,28 +36,27 @@ def run(file: str = DEFAULT_GRID) -> None:
         app = QApplication(sys.argv)
 
     while True:
-        selected_file = None
+        selected = [None]
 
-        # Callback interne pour récupérer la grille sélectionnée
-        def on_game_start(path: str):
-            nonlocal selected_file
-            selected_file = path
+        # Callback interne pour recuperer la grille selectionnee
+        def on_game_start(path):
+            selected[0] = path
 
-        """1. Show the startup screen"""
+        # 1. Show the startup screen
         app.setStyleSheet("QWidget { background-color: #1E1E1E; color: white; }")
         startup = StartupWindow()
         startup.start_game_signal.connect(on_game_start)
         startup.show()
         app.exec()
 
-        """2. If a file was selected, launch the game"""
-        if not selected_file:
+        # 2. If a file was selected, launch the game
+        if not selected[0]:
             break
 
         app.setStyleSheet("QWidget { background-color: white; color: black; }")
 
         try:
-            controller = Controller(selected_file)
+            controller = Controller(selected[0])
             controller.view.show()
             app.exec()
 
