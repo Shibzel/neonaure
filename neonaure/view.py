@@ -25,16 +25,16 @@ if TYPE_CHECKING:
     from .controller import Controller
 
 
-# Chemins de base du projet et du dossier d'assets
+# Base paths for the project and assets folder
 _BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _ASSETS_DIR: str = os.path.join(_BASE_DIR, "assets", "icons")
 
-# Renvoie le chemin absolu d'une icone dans le dossier assets
+# Returns the absolute path of an icon in the assets folder
 def _icon_path(name: str) -> str:
     return os.path.join(_ASSETS_DIR, name)
 
 
-# Popup de selection d'un nombre pour une cellule
+# Popup for selecting a number for a cell
 class NumberSelector(QDialog):
     def __init__(self, parent: QWidget, options: list[int], cell_global_pos: QPoint, cell_size: int) -> None:
         super().__init__(parent)
@@ -61,7 +61,7 @@ class NumberSelector(QDialog):
                 col = 0
                 row += 1
 
-        # Bouton croix pour fermer le popup
+        # Cross button to close the popup
         close_btn: QPushButton = QPushButton()
         close_btn.setIcon(QIcon(_icon_path("cross.png")))
         close_btn.setIconSize(QSize(btn_size - 8, btn_size - 8))
@@ -87,13 +87,13 @@ class NumberSelector(QDialog):
 
         self.move(x, y)
 
-    # Enregistre le nombre choisi et ferme le popup
+    # Saves the selected number and closes the popup
     def select_number(self, n: int) -> None:
         self.selected_number = n
         self.accept()
 
 
-# Widget d'affichage et d'interaction avec la grille de jeu
+# Widget for displaying and interacting with the game grid
 class GridView(QWidget):
     cell_clicked: pyqtSignal = pyqtSignal(int, int)
 
@@ -112,7 +112,7 @@ class GridView(QWidget):
         self.hovered_row: int = -1
         self.hovered_col: int = -1
 
-    # Calcule la taille d'une cellule pour que la grille tienne dans le widget
+    # Calculates cell size so the grid fits in the widget
     def _compute_cell_size(self) -> int:
         if self.rows == 0 or self.cols == 0:
             return 50
@@ -120,17 +120,17 @@ class GridView(QWidget):
         available_h: int = self.height() - 20
         cell_w: int = available_w // self.cols if self.cols > 0 else 50
         cell_h: int = available_h // self.rows if self.rows > 0 else 50
-        # Réduction de la limite minimale à 5 pour s'adapter aux grilles très rectangulaires
+        # Reduced minimum limit to 5 to adapt to highly rectangular grids
         return max(5, min(cell_w, cell_h))
 
-    # Centre la grille dans le widget
+    # Centers the grid in the widget
     def _compute_offset(self) -> None:
         grid_w: int = self.cols * self.cell_size
         grid_h: int = self.rows * self.cell_size
         self.offset_x = max(0, (self.width() - grid_w) // 2)
         self.offset_y = max(0, (self.height() - grid_h) // 2)
 
-    # Detecte les conflits : valeurs identiques entre voisins ou dans un meme motif
+    # Detects conflicts: identical values among neighbors or within the same pattern
     def _compute_conflicts(self) -> set[tuple[int, int]]:
         conflicts = set()
 
@@ -165,14 +165,14 @@ class GridView(QWidget):
 
         return conflicts
 
-    # Recalcule la taille des cellules et le centrage au redimensionnement
+    # Recalculates cell size and centering on resize
     def resizeEvent(self, event: QResizeEvent) -> None:  # type: ignore[override]
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         super().resizeEvent(event)
         self.update()
 
-    # Met a jour les donnees affichees par la grille
+    # Updates the data displayed by the grid
     def set_data(
         self,
         rows: int,
@@ -188,13 +188,13 @@ class GridView(QWidget):
         self.thick_borders = thick_borders
         self.immutable_cells = immutable_cells
         self.pattern_membership = pattern_membership or {}
-        # Réduction de la marge pour ne pas faire exploser la fenêtre sur des formats spéciaux
+        # Reduced margin to avoid window explosion on special formats
         self.setMinimumSize(self.cols * 5 + 20, self.rows * 5 + 20)
         self.cell_size = self._compute_cell_size()
         self._compute_offset()
         self.update()
 
-    # Gere le survol des cellules pour le highlight
+    # Handles cell hover for highlighting
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         x_rel: int = event.pos().x() - self.offset_x
         y_rel: int = event.pos().y() - self.offset_y
@@ -212,13 +212,13 @@ class GridView(QWidget):
                 self.hovered_col = -1
                 self.update()
 
-    # Retire le highlight quand la souris quitte le widget
+    # Removes highlight when mouse leaves the widget
     def leaveEvent(self, event: QEvent) -> None:  # type: ignore[override]
         self.hovered_row = -1
         self.hovered_col = -1
         self.update()
 
-    # Emet un signal quand l'utilisateur clique sur une cellule modifiable
+    # Emits a signal when the user clicks on a modifiable cell
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         x_rel: int = event.pos().x() - self.offset_x
         y_rel: int = event.pos().y() - self.offset_y
@@ -231,7 +231,7 @@ class GridView(QWidget):
             if (margin <= local_x <= self.cell_size - margin) and (margin <= local_y <= self.cell_size - margin):
                 self.cell_clicked.emit(col, row)
 
-    # Dessine la grille : cellules, valeurs, bordures épaisses et conflits
+    # Draws the grid: cells, values, thick borders, and conflicts
     def paintEvent(self, event: QPaintEvent) -> None:  # type: ignore[override]
         painter: QPainter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -284,9 +284,9 @@ class GridView(QWidget):
             painter.drawLine(x1, y1, x2, y2)
 
 
-# Dialogue pour choisir la taille d'une nouvelle grille
+# Dialog to choose the size of a new grid
 class GridSizeDialog(QDialog):
-    """Popup pour choisir les dimensions X/Y de la nouvelle grille."""
+    """Popup to choose the X/Y dimensions of the new grid."""
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -310,7 +310,7 @@ class GridSizeDialog(QDialog):
         layout.addRow(confirm_btn)
 
 
-# Fenetre principale du jeu avec la grille et les boutons
+# Main game window with the grid and buttons
 class MainWindow(QMainWindow):
     def __init__(self, controller: Controller) -> None:
         super().__init__()
@@ -374,9 +374,9 @@ class MainWindow(QMainWindow):
         self.grid_view.cell_clicked.connect(self.controller.handle_click)  # type: ignore[arg-type]
         self.resize(560, 500)
 
-    # Ouvre le dialogue de generation d'une nouvelle carte
+    # Opens the dialog to generate a new map
     def _on_map_clicked(self) -> None:
-        """Ouvre le dialogue de taille puis demande au controller de générer."""
+        """Opens the size dialog then asks the controller to generate."""
         dialog: GridSizeDialog = GridSizeDialog(self)
         if dialog.exec():
             self.controller.generate_new_grid(
@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
             )
 
 
-# Grille de test avec 15 motifs predefinis
+# Test grid with 15 predefined patterns
 test_data: dict[str, list[list[int]]] = {
     "motif1": [[0,0,0], [1,0,0], [0,1,0], [1,1,3], [2,1,0]],
     "motif2": [[2,0,5], [3,0,0], [4,0,0], [4,1,0], [5,0,0]],
@@ -404,7 +404,7 @@ test_data: dict[str, list[list[int]]] = {
     "motif15": [[5,5,0]],
 }
 
-# Transforme les donnees brutes en structures utilisables par GridView
+# Transforms raw data into structures usable by GridView
 def prepare_test_data(
     data: dict[str, list[list[int]]],
 ) -> tuple[int, int, dict[tuple[int, int], int], list[tuple[int, int, int, int]], set[tuple[int, int]], dict[tuple[int, int], str]]:
@@ -438,7 +438,7 @@ def prepare_test_data(
     return rows, cols, values, thick_borders, immutable_cells, pattern_membership
 
 
-# Fenetre de test standalone pour tester la vue sans le controleur
+# Standalone test window to test the view without the controller
 class TestWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -504,7 +504,7 @@ class TestWindow(QMainWindow):
         self.values: dict[tuple[int, int], int] = val
         self.view.cell_clicked.connect(self.handle_test_click)  # type: ignore[arg-type]
 
-    # Gere le clic sur une cellule en mode test
+    # Handles clicking on a cell in test mode
     def handle_test_click(self, col: int, row: int) -> None:
         if (row, col) in self.immutable_cells:
             return
@@ -553,7 +553,7 @@ class TestWindow(QMainWindow):
                 self.pattern_membership,
             )
 
-    # Annule le dernier coup joue en mode test
+    # Undoes the last move played in test mode
     def undo(self) -> None:
         if not self.history:
             return
@@ -568,7 +568,7 @@ class TestWindow(QMainWindow):
             self.pattern_membership,
         )
 
-    # Reinitialise la grille en supprimant les valeurs non immuables
+    # Resets the grid by removing non-immutable values
     def reset_grid(self) -> None:
         keys_to_remove = []
         for pos in self.values:

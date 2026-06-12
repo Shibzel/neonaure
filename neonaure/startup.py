@@ -1,8 +1,8 @@
 """
 Neonaure - Startup Module
 
-Gère l'écran de démarrage du jeu, la détection des grilles de campagne,
-la prévisualisation épurée (sans texte), le verrouillage visuel et la progression.
+Handles the game's startup screen, campaign grid detection,
+clean preview (without text), visual locking, and progression.
 """
 
 import os
@@ -24,14 +24,14 @@ except ImportError:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from generate_grid import generate_grid
 
-# Calcul dynamique des chemins absolus
+# Dynamic calculation of absolute paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROGRESS_FILE = os.path.join(BASE_DIR, "data", "progress.json")
 GRIDS_DIR = os.path.join(BASE_DIR, "data", "grids")
 
 
 def load_progress() -> list[str]:
-    """Charge la liste des grilles débloquées depuis le fichier de sauvegarde."""
+    """Loads the list of unlocked grids from the save file."""
     if os.path.exists(PROGRESS_FILE):
         try:
             with open(PROGRESS_FILE, "r") as f:
@@ -42,27 +42,27 @@ def load_progress() -> list[str]:
 
 
 def save_progress(unlocked: list[str]) -> None:
-    """Sauvegarde la liste des grilles débloquées dans le fichier de progression."""
+    """Saves the list of unlocked grids to the progress file."""
     os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
     with open(PROGRESS_FILE, "w") as f:
         json.dump({"unlocked": unlocked}, f)
 
 
 def natural_sort_key(s: str) -> list:
-    """Clé de tri pour classer 'grille2' avant 'grille10'."""
+    """Sort key to rank 'grid2' before 'grid10'."""
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split('([0-9]+)', s)]
 
 
 def unlock_next_grid(current_file_path: str) -> None:
-    """Débloque la grille de campagne suivante dans l'ordre."""
+    """Unlocks the next campaign grid in order."""
     unlocked = load_progress()
     current_name = os.path.basename(current_file_path)
     
     if not os.path.exists(GRIDS_DIR):
         return
 
-    # On récupère les grilles, sans les générées
+    # Retrieve grids, excluding generated ones
     files = [os.path.basename(f) for f in glob(os.path.join(GRIDS_DIR, "*.json"))]
     files = [f for f in files if not f.startswith("grid_gen_")]
     files.sort(key=natural_sort_key)
@@ -83,46 +83,46 @@ def unlock_next_grid(current_file_path: str) -> None:
 
 
 class PreviewGridView(GridView):
-    """Composant de prévisualisation adaptatif. Dessine la structure de la grille sans le texte."""
+    """Adaptive preview component. Draws the grid structure without text."""
     
     def __init__(self, is_unlocked: bool, parent=None):
         super().__init__(parent)
         self.is_unlocked = is_unlocked
 
     def paintEvent(self, event) -> None:
-        """Surcharge totale du dessin pour forcer le centrage, la taille et retirer le texte."""
+        """Total override of drawing to force centering, size, and remove text."""
         painter: QPainter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Fond de la zone de dessin
+        # Drawing area background
         bg_color = Qt.GlobalColor.white if self.is_unlocked else QColor(245, 245, 245)
         painter.fillRect(self.rect(), bg_color)
 
         if self.rows == 0 or self.cols == 0:
             return
 
-        # 1. Marge augmentée pour éviter que le dessin touche ou dépasse de la carte
+        # 1. Increased margin to prevent drawing from touching or overflowing the card
         margin = 16
         avail_w = self.width() - (margin * 2)
         avail_h = self.height() - (margin * 2)
 
-        # Taille d'une case (on prend le plus petit pour que tout rentre)
+        # Cell size (take the smallest so everything fits)
         cs = max(1, min(avail_w // self.cols, avail_h // self.rows))
         
-        # Taille totale de la grille dessinée
+        # Total size of the drawn grid
         grid_w = cs * self.cols
         grid_h = cs * self.rows
 
-        # 2. Centrage parfait (offsets locaux, ignore ceux de la classe parente)
+        # 2. Perfect centering (local offsets, ignores parent class ones)
         ox = (self.width() - grid_w) // 2
         oy = (self.height() - grid_h) // 2
 
-        # 3. Choix des couleurs (Mode Jouable vs Mode Verrouillé)
+        # 3. Color choice (Playable Mode vs Locked Mode)
         grid_line_color = QColor(200, 200, 200) if self.is_unlocked else QColor(220, 220, 220)
         thick_line_color = Qt.GlobalColor.black if self.is_unlocked else QColor(160, 160, 160)
         immuable_bg_color = QColor(210, 210, 210) if self.is_unlocked else QColor(235, 235, 235)
 
-        # 4. Dessin des cases de fond et des bordures fines
+        # 4. Drawing background cells and thin borders
         thin_pen = QPen(grid_line_color, 1)
         for i in range(self.rows):
             for j in range(self.cols):
@@ -135,9 +135,9 @@ class PreviewGridView(GridView):
                 painter.setPen(thin_pen)
                 painter.drawRect(x, y, cs, cs)
 
-        # 5. Dessin des bordures épaisses des motifs
+        # 5. Drawing thick pattern borders
         thick_pen = QPen(thick_line_color, max(2, int(cs * 0.1)))
-        thick_pen.setCapStyle(Qt.PenCapStyle.SquareCap) # Joints plus propres
+        thick_pen.setCapStyle(Qt.PenCapStyle.SquareCap) # Cleaner joints
         painter.setPen(thick_pen)
 
         for border in self.thick_borders:
@@ -149,7 +149,7 @@ class PreviewGridView(GridView):
 
 
 class LevelCard(QFrame):
-    """Carte cliquable affichant une prévisualisation dynamique de la grille."""
+    """Clickable card displaying a dynamic grid preview."""
     clicked = pyqtSignal(str)
 
     def __init__(self, file_path: str, is_unlocked: bool, parent=None):
@@ -184,7 +184,7 @@ class LevelCard(QFrame):
         layout.addWidget(lbl)
             
     def _setup_preview(self) -> None:
-        """Extrait et configure les données du modèle pour l'affichage de la miniature."""
+        """Extracts and configures model data for thumbnail display."""
         try:
             grid = Grid.from_json(self.file_path)
             values = {}
@@ -192,7 +192,7 @@ class LevelCard(QFrame):
             immutable_cells = set()
             pattern_membership = {}
             
-            # C'est ici que l'inversion Width/Height provoquait les bugs de lecture !
+            # This is where the Width/Height inversion caused reading bugs!
             cols, rows = grid.get_dimensions()
             
             for pattern in grid.patterns:
@@ -220,13 +220,13 @@ class LevelCard(QFrame):
             print(f"Erreur lors du chargement de la miniature pour {self.file_path}: {e}")
 
     def mousePressEvent(self, event) -> None:
-        """Déclenche le signal d'ouverture si la grille est accessible."""
+        """Triggers the opening signal if the grid is accessible."""
         if self.is_unlocked:
             self.clicked.emit(self.file_path)
 
 
 class GenerateCard(QFrame):
-    """Bouton spécial sous forme de carte pour générer instantanément une grille 8x8."""
+    """Special card-shaped button to instantly generate an 8x8 grid."""
     clicked = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -242,12 +242,12 @@ class GenerateCard(QFrame):
         layout.addWidget(lbl)
 
     def mousePressEvent(self, event) -> None:
-        """Déclenche l'action de génération lors du clic."""
+        """Triggers the generation action on click."""
         self.clicked.emit()
 
 
 class StartupWindow(QWidget):
-    """Fenêtre principale blanche listant les niveaux et l'action de génération."""
+    """Main white window listing levels and the generation action."""
     start_game_signal = pyqtSignal(str)
 
     def __init__(self):
@@ -283,7 +283,7 @@ class StartupWindow(QWidget):
         self._load_levels()
 
     def _load_levels(self) -> None:
-        """Instancie et trie les cartes de niveaux valides (sans les générées) pour la sélection."""
+        """Instantiates and sorts valid level cards (excluding generated ones) for selection."""
         unlocked = load_progress()
         
         gen_card = GenerateCard()
@@ -294,11 +294,11 @@ class StartupWindow(QWidget):
             print(f"Dossier introuvable : {GRIDS_DIR}")
             return
 
-        # On récupère tous les fichiers .json du dossier, en excluant ceux qui commencent par "grid_gen_"
+        # Retrieve all .json files in the folder, excluding those starting with "grid_gen_"
         files = glob(os.path.join(GRIDS_DIR, "*.json"))
         files = [os.path.normpath(f) for f in files if not os.path.basename(f).startswith("grid_gen_")]
         
-        # Tri naturel : grille2 avant grille10
+        # Natural sort: grid2 before grid10
         files.sort(key=lambda x: natural_sort_key(os.path.basename(x)))
         
         default_path = os.path.normpath(os.path.join(GRIDS_DIR, "default.json"))
@@ -321,12 +321,12 @@ class StartupWindow(QWidget):
                 row += 1
 
     def _on_level_selected(self, file_path: str) -> None:
-        """Transmet le fichier sélectionné au jeu principal et ferme proprement l'accueil."""
+        """Transmits the selected file to the main game and cleanly closes the home screen."""
         self.start_game_signal.emit(file_path)
         self.close()
 
     def _generate_and_play(self) -> None:
-        """Génère une configuration aléatoire 8x8, l'enregistre et lance la partie immédiatement."""
+        """Generates a random 8x8 configuration, saves it, and launches the game immediately."""
         data = generate_grid(8, 8)
         os.makedirs(GRIDS_DIR, exist_ok=True)
         
